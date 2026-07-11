@@ -145,10 +145,51 @@ POST /auth/refresh
 
 Returns a new access token and a new rotated refresh token using a valid, unrevoked refresh token.
 
+Request body:
+
+{
+  "refreshToken": "string"
+}
+
+Success response data:
+
+{
+  "accessToken": "string",
+  "refreshToken": "string",
+  "expiresIn": 900
+}
+
+expiresIn is the access-token lifetime in seconds.
+
 Logout
 POST /auth/logout
 
 Revokes the active refresh-token session.
+
+Request body:
+
+{
+  "refreshToken": "string"
+}
+
+Logout is idempotent. It must not reveal whether the supplied refresh token existed or was already revoked.
+
+Success response data:
+
+{
+  "success": true
+}
+
+This object is business data. It is still wrapped by the approved global success envelope, producing:
+
+{
+  "success": true,
+  "data": {
+    "success": true
+  }
+}
+
+Logout does not use a special envelope exception.
 
 Forgot Password
 POST /auth/forgot-password
@@ -201,9 +242,16 @@ The Flutter application must use the code property for predictable application b
 
 The application must never depend on parsing human-readable error messages.
 
-Example error codes:
+Stable v1 codes for the login/refresh/logout boundary:
 
-AUTH_INVALID_CREDENTIALS
+INVALID_CREDENTIALS
+INVALID_REFRESH_TOKEN
+USER_DISABLED
+
+These codes are authoritative for POST /auth/login, POST /auth/refresh, and POST /auth/logout and must not be paired with a conflicting AUTH_-prefixed equivalent for the same condition.
+
+Example error codes for other areas:
+
 AUTH_SESSION_EXPIRED
 ORGANIZATION_ACCESS_DENIED
 PERMISSION_DENIED
@@ -882,6 +930,20 @@ Report exports
 Rate-limit responses should return:
 
 429 Too Many Requests
+
+Approved v1 Authentication Rate Limits
+
+The approved v1 rate-limit package is @nestjs/throttler.
+
+Endpoint-specific limits for the current public authentication boundary:
+
+POST /auth/login: maximum 5 requests per 60 seconds per client IP
+POST /auth/refresh: maximum 10 requests per 60 seconds per client IP
+POST /auth/logout: maximum 20 requests per 60 seconds per client IP
+
+The throttling key is client IP only, derived through standard NestJS/Express request IP handling. Do not combine the key with email, user ID, refresh-token hash, or device identity. Do not manually parse X-Forwarded-For inside auth controllers.
+
+Rejected requests return 429 Too Many Requests. Persistent account lockout remains out of scope for v1.
 HTTP Status Codes
 Code	Meaning
 200	Success

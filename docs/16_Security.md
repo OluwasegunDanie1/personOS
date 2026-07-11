@@ -538,6 +538,32 @@ Session
 
 Do not rely on IP-based rate limiting alone for authenticated abuse prevention.
 
+Approved v1 Authentication Rate-Limit Configuration
+
+The approved NestJS rate-limit package is @nestjs/throttler.
+
+Approved v1 thresholds for the public authentication boundary:
+
+POST /auth/login: maximum 5 requests per 60 seconds per client IP
+POST /auth/refresh: maximum 10 requests per 60 seconds per client IP
+POST /auth/logout: maximum 20 requests per 60 seconds per client IP
+
+For this boundary, client IP is the sole approved throttling key, resolved through standard NestJS/Express request IP handling. Do not manually parse X-Forwarded-For inside auth controllers. Do not combine the IP key with email, user ID, refresh-token hash, or device fingerprinting for this boundary.
+
+Rate-limit rejection returns 429 Too Many Requests.
+
+These thresholds and the package/keying decision apply specifically to the login/refresh/logout boundary. A generic requirement to rate limit elsewhere in this document does not by itself authorize thresholds, package selection, or keying strategy for other endpoints.
+
+Trust-Proxy Boundary
+
+Correct client-IP resolution depends on the deployment network boundary.
+
+Local development: the backend receives direct local connections. Express trust proxy remains disabled. Request IP is derived from the direct socket/client connection.
+
+Non-production and production: the deployed API may run behind a reverse proxy or platform ingress. The approved backend environment variable TRUST_PROXY controls Express trust proxy configuration in these environments. TRUST_PROXY is required before public authentication exposure in non-production or production. It has no hardcoded fallback and must fail clearly if required and absent or empty. Its value is the explicitly configured trusted proxy hop count, expressed as a positive integer, and is used to configure Express trust proxy from that validated hop count. Do not configure trust proxy using a boolean true value. Do not trust arbitrary proxy addresses. Do not manually parse X-Forwarded-For.
+
+NODE_ENV distinguishes development, test, and production for this authority. No additional environment-naming variable is introduced. A separately deployed non-production environment that publicly exposes authentication endpoints must configure TRUST_PROXY under the same rule before that exposure.
+
 Brute-Force Protection
 
 Authentication endpoints must be protected against repeated credential attempts.
@@ -551,9 +577,13 @@ Suspicious login monitoring
 
 Persistent account lockout is not part of Relvio v1. Do not add failed-attempt counters or locked-until fields.
 
-Rate limiting and brute-force protection remain required. Exact rate-limit thresholds are not decided in this task and must be resolved before public authentication exposure.
+Rate limiting and brute-force protection remain required. Exact thresholds, package, keying strategy, and trust-proxy configuration for the login/refresh/logout boundary are resolved above. The forgot-password rate-limit threshold remains unresolved and must be decided before that endpoint is publicly exposed.
 
 Security controls must avoid exposing whether a specific email account exists.
+
+Authentication CORS Boundary
+
+Native Flutter Android and iOS clients are not governed by browser CORS enforcement. Relvio v1 does not approve Flutter Web or other browser-client exposure. No CORS policy is introduced for the current native-mobile authentication API boundary. Browser exposure requires a future, separately approved CORS authority decision.
 
 Idempotency Security
 

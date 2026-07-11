@@ -110,6 +110,10 @@ The backend should expose REST APIs.
 
 Token hashing and opaque token generation use Node's built-in `crypto` module only; no additional package is approved for that responsibility.
 
+### Approved Backend Rate-Limiting Package
+
+- @nestjs/throttler for the public authentication rate-limit boundary (POST /auth/login, POST /auth/refresh, POST /auth/logout)
+
 ---
 
 ## Mobile Client Configuration

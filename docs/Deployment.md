@@ -403,15 +403,33 @@ Backend authentication configuration must fail clearly when JWT_ACCESS_SECRET is
 
 For the minimal login, refresh, and logout implementation phase, JWT_ACCESS_SECRET is the only newly required authentication secret. Refresh, email-verification, and password-reset tokens are opaque random values that are hashed for storage and do not require a separate signing secret.
 
+Trust-Proxy Environment Configuration
+
+TRUST_PROXY is the approved backend environment variable controlling Express trust proxy configuration for the public authentication rate-limit boundary. Its value is the explicitly configured trusted proxy hop count, expressed as a positive integer. It has no hardcoded fallback.
+
+Local development: Express trust proxy remains disabled; TRUST_PROXY is not required.
+
+Non-production and production: TRUST_PROXY is required before publicly exposing the authentication endpoints. Backend configuration must fail clearly when TRUST_PROXY is required and absent or empty.
+
+NODE_ENV distinguishes development, test, and production for this authority. No additional environment-naming variable is introduced. A separately deployed non-production environment must configure TRUST_PROXY under this same rule before publicly exposing authentication endpoints.
+
+Full behavioral detail is governed by 16_Security.md.
+
 Authentication Public-Exposure Readiness
 
-The following remain intentionally unresolved and must be decided before authentication endpoints are exposed to public production traffic:
+Resolved for the login/refresh/logout boundary:
 
-Exact login rate-limit threshold/window
-Exact refresh rate-limit threshold/window
+Rate-limit package: @nestjs/throttler
+Login threshold: 5 requests per 60 seconds per client IP
+Refresh threshold: 10 requests per 60 seconds per client IP
+Logout threshold: 20 requests per 60 seconds per client IP
+Rate-limit key: client IP only, via standard NestJS/Express request IP handling
+Trust-proxy configuration: TRUST_PROXY (see above and 16_Security.md)
+CORS: not applicable to the native-mobile boundary; no policy introduced; browser exposure remains unapproved
+
+The following remain intentionally unresolved and must be decided before the affected endpoints are exposed to public production traffic:
+
 Exact forgot-password rate-limit threshold/window
-Trust-proxy configuration
-CORS configuration
 Email verification delivery provider/mechanism
 Password-reset delivery provider/mechanism
 
