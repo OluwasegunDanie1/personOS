@@ -293,6 +293,8 @@ Different roles in different organizations
 
 Role and permission context must be evaluated per organization.
 
+Membership is represented by an Organization Membership record linking a User, an Organization, and a Role. A user has at most one Organization Membership per organization. A membership's role must belong to the same organization as the membership.
+
 Example:
 
 User A

@@ -234,12 +234,18 @@ Adds the authenticated user to the organization.
 Revoke Invitation
 DELETE /organizations/{organizationId}/invitations/{invitationId}
 Organization Members
+
+These endpoints operate on a user's Organization Membership within the given organization. A user is a global identity and may hold a separate membership, with its own role, in each organization they belong to.
+
 List Members
 GET /organizations/{organizationId}/members
 View Member
 GET /organizations/{organizationId}/members/{userId}
 Update Member Role
 PATCH /organizations/{organizationId}/members/{userId}/role
+
+Updates the role on the user's membership for this organization only.
+
 Remove Member
 DELETE /organizations/{organizationId}/members/{userId}
 People Endpoints
@@ -460,7 +466,7 @@ Idempotency-Key: <unique-key>
 
 Repeated requests using the same idempotency key must not create duplicate attendance records.
 
-The backend must also enforce attendance uniqueness using database constraints.
+The backend must also enforce attendance uniqueness using a database-level constraint on (organization_id, event_id, person_id), matching the approved Database Design.
 
 Communities
 List Communities

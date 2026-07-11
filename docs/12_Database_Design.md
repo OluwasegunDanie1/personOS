@@ -34,7 +34,8 @@ Reason:
 
 - Normalize data where appropriate.
 - Avoid duplicate information.
-- Every record belongs to an organization.
+- Every organization-owned record belongs to an organization.
+- Users are a global identity linked to organizations through Organization Memberships.
 - Use UUIDs as primary keys.
 - Never hard delete important records.
 - Track creation and update dates.
@@ -67,18 +68,18 @@ Fields:
 
 ## Users
 
-Stores users who can access Relvio.
+Stores global user identities who can access Relvio.
+
+A user is not owned by a single organization. A user may belong to multiple organizations through Organization Memberships.
 
 Fields:
 
 - id
-- organization_id
 - first_name
 - last_name
 - email
 - password_hash
 - phone
-- role_id
 - status
 - last_login
 - created_at
@@ -89,6 +90,8 @@ Fields:
 ## Roles
 
 Defines user permissions.
+
+Roles remain organization-owned.
 
 Fields:
 
@@ -105,6 +108,28 @@ Examples:
 - Team Lead
 - Volunteer
 - Member
+
+---
+
+## Organization Memberships
+
+Represents one User's membership in one Organization.
+
+A User may belong to multiple Organizations through separate Organization Membership records. A User may have only one membership record per Organization.
+
+Fields:
+
+- id
+- organization_id
+- user_id
+- role_id
+- created_at
+
+Unique constraint: (organization_id, user_id).
+
+Role assignment is scoped to the membership, not to the User directly. A membership's role_id must reference a Role owned by the same organization_id as the membership. The database schema should structurally enforce this same-organization membership-to-role linkage where supported by the persistence/database constraint model.
+
+---
 
 ## Role Permissions
 
@@ -281,6 +306,10 @@ Status:
 - Absent
 - Late
 
+Unique constraint: (organization_id, event_id, person_id).
+
+This is the database-level attendance idempotency / duplicate-prevention boundary. A given person may have only one attendance record per event within an organization.
+
 ---
 
 ## Follow-ups
@@ -370,7 +399,7 @@ Fields:
 ```
 Organization
 │
-├── Users
+├── Organization Memberships
 ├── Roles
 ├── People
 ├── Events
@@ -378,6 +407,14 @@ Organization
 ├── Tags
 ├── Reports
 └── Notifications
+
+User
+│
+└── Organization Memberships
+
+Role
+│
+└── Organization Memberships
 
 People
 │
@@ -435,7 +472,9 @@ Create indexes for:
 - event_id
 - person_id
 - created_at
-(organization_id, email)
+(organization_id, user_id)
+
+(organization_id, event_id, person_id)
 
 (organization_id, person_id)
 
@@ -478,10 +517,12 @@ The database should:
 
 # Constraints
 
-- Email should be unique within an organization.
+- Email should be unique globally across Users.
 - Slug should be globally unique.
 - Foreign keys must enforce referential integrity.
 - Required fields should use NOT NULL.
+- Organization Membership must be unique per (organization_id, user_id).
+- Attendance must be unique per (organization_id, event_id, person_id). This is the database-level attendance idempotency / duplicate-prevention boundary.
 
 UUID v4 should be used for all primary keys.
 # End of Document
