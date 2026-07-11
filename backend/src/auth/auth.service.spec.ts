@@ -66,6 +66,7 @@ describe('AuthService', () => {
 
   beforeEach(() => {
     prisma = createMockPrisma();
+    prisma.$transaction.mockImplementation((ops: unknown[]) => Promise.all(ops));
     opaqueTokenService = new OpaqueTokenService();
     accessTokenService = new AccessTokenService(
       new JwtService({
@@ -198,6 +199,63 @@ describe('AuthService', () => {
       expect(result.user).not.toHaveProperty('role');
       expect(result.user).not.toHaveProperty('permissions');
     });
+
+    const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    it('generates a UUID-compatible familyId, not an opaque token', async () => {
+      const user = buildUser();
+      prisma.user.findUnique.mockResolvedValue(user);
+      prisma.user.update.mockResolvedValue(user);
+      prisma.refreshToken.create.mockResolvedValue({});
+
+      await authService.login({ email: 'ada@example.com', password: 'correct-password' });
+
+      const createArgs = prisma.refreshToken.create.mock.calls[0][0];
+      expect(createArgs.data.familyId).toMatch(UUID_PATTERN);
+    });
+
+    it('calls OpaqueTokenService.generate exactly once, only for the refresh token', async () => {
+      const user = buildUser();
+      prisma.user.findUnique.mockResolvedValue(user);
+      prisma.user.update.mockResolvedValue(user);
+      prisma.refreshToken.create.mockResolvedValue({});
+      const generateSpy = jest.spyOn(opaqueTokenService, 'generate');
+
+      await authService.login({ email: 'ada@example.com', password: 'correct-password' });
+
+      expect(generateSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('submits the lastLogin update and refresh-token creation through one Prisma transaction', async () => {
+      const user = buildUser();
+      prisma.user.findUnique.mockResolvedValue(user);
+      prisma.user.update.mockResolvedValue(user);
+      prisma.refreshToken.create.mockResolvedValue({});
+
+      await authService.login({ email: 'ada@example.com', password: 'correct-password' });
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      const transactionArg = prisma.$transaction.mock.calls[0][0];
+      expect(Array.isArray(transactionArg)).toBe(true);
+      expect(transactionArg).toHaveLength(2);
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-1' },
+        data: { lastLogin: expect.any(Date) },
+      });
+      expect(prisma.refreshToken.create).toHaveBeenCalled();
+    });
+
+    it('does not produce a successful login result when the transaction fails', async () => {
+      const user = buildUser();
+      prisma.user.findUnique.mockResolvedValue(user);
+      prisma.user.update.mockResolvedValue(user);
+      prisma.refreshToken.create.mockResolvedValue({});
+      prisma.$transaction.mockRejectedValueOnce(new Error('transaction failed'));
+
+      await expect(
+        authService.login({ email: 'ada@example.com', password: 'correct-password' }),
+      ).rejects.toThrow('transaction failed');
+    });
   });
 
   describe('refresh', () => {
@@ -275,6 +333,20 @@ describe('AuthService', () => {
         data: expect.objectContaining({ familyId: 'family-1' }),
       });
       expect(result.expiresIn).toBe(900);
+    });
+
+    it('preserves the existing familyId and never generates a new one during rotation', async () => {
+      const token = buildRefreshToken({ familyId: 'family-1' });
+      prisma.refreshToken.findUnique.mockResolvedValue(token);
+      prisma.user.findUnique.mockResolvedValue(buildUser());
+      const generateSpy = jest.spyOn(opaqueTokenService, 'generate');
+
+      await authService.refresh({ refreshToken: 'valid-token' });
+
+      // Called once, only for the new raw refresh token, never for familyId.
+      expect(generateSpy).toHaveBeenCalledTimes(1);
+      const createArgs = prisma.refreshToken.create.mock.calls[0][0];
+      expect(createArgs.data.familyId).toBe('family-1');
     });
 
     it('never persists the raw replacement refresh token', async () => {

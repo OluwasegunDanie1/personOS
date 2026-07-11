@@ -1,4 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { UserStatus } from '../../generated/prisma/client';
 import { ApiException } from '../common/http/api-exception';
 import { PrismaService } from '../database/prisma.service';
@@ -53,24 +54,28 @@ export class AuthService {
       throw this.userDisabledError();
     }
 
-    const updatedUser = await this.prisma.user.update({
-      where: { id: user.id },
-      data: { lastLogin: new Date() },
-    });
-
-    const accessToken = this.accessTokenService.sign(user.id);
     const rawRefreshToken = this.opaqueTokenService.generate();
     const refreshTokenHash = this.opaqueTokenService.hash(rawRefreshToken);
-    const familyId = this.opaqueTokenService.generate();
+    // Internal refresh-family identifier, not an authentication token: must
+    // be UUID-compatible for the RefreshToken.familyId @db.Uuid column.
+    const familyId = randomUUID();
 
-    await this.prisma.refreshToken.create({
-      data: {
-        userId: user.id,
-        tokenHash: refreshTokenHash,
-        familyId,
-        expiresAt: new Date(Date.now() + REFRESH_TOKEN_LIFETIME_MS),
-      },
-    });
+    const [updatedUser] = await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: user.id },
+        data: { lastLogin: new Date() },
+      }),
+      this.prisma.refreshToken.create({
+        data: {
+          userId: user.id,
+          tokenHash: refreshTokenHash,
+          familyId,
+          expiresAt: new Date(Date.now() + REFRESH_TOKEN_LIFETIME_MS),
+        },
+      }),
+    ]);
+
+    const accessToken = this.accessTokenService.sign(user.id);
 
     return {
       accessToken,
