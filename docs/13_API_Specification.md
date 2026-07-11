@@ -92,9 +92,9 @@ Example:
 
 Authorization: Bearer <access_token>
 
-Access tokens should be short-lived.
+Access tokens are signed JWTs with a 15-minute lifetime.
 
-Refresh tokens or secure sessions should be used to renew authentication.
+Refresh tokens are opaque, cryptographically secure random values with a 30-day lifetime. Refresh tokens rotate on every successful refresh. Reuse of an already rotated or revoked refresh token is treated as suspicious and revokes the entire refresh-token family.
 
 Authentication failures must return:
 
@@ -112,17 +112,33 @@ Creates a user account.
 Login
 POST /auth/login
 
-Authenticates a user and creates a session.
+Authenticates a user using email and password.
+
+Request fields:
+
+email
+password
+
+Success response data:
+
+accessToken
+refreshToken
+expiresIn
+user
+
+expiresIn is the access-token lifetime in seconds.
+
+Login returns the global User identity. Login does not automatically select an active Organization context. Organization context selection is a separate explicit membership/context workflow.
 
 Refresh Session
 POST /auth/refresh
 
-Returns a new access token using a valid refresh token or session.
+Returns a new access token and a new rotated refresh token using a valid, unrevoked refresh token.
 
 Logout
 POST /auth/logout
 
-Invalidates the current session.
+Revokes the active refresh-token session.
 
 Forgot Password
 POST /auth/forgot-password
@@ -139,7 +155,7 @@ Resets a password using a valid reset token.
 Current User
 GET /auth/me
 
-Returns the authenticated user and active organization context.
+Returns the authenticated user and the active organization context where one has been separately established.
 
 Standard Response Format
 Success Response

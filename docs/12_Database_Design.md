@@ -85,6 +85,66 @@ Fields:
 - created_at
 - updated_at
 
+status is a closed v1 value set: ACTIVE, DISABLED. Disabled users cannot authenticate or refresh authentication.
+
+---
+
+## Refresh Tokens
+
+Supports refresh-token-based session renewal.
+
+Raw refresh tokens are never stored. Only the cryptographic hash of the token is stored.
+
+Fields:
+
+- id
+- user_id
+- token_hash
+- family_id
+- expires_at
+- revoked_at
+- created_at
+
+family_id supports revoking an entire refresh-token family after confirmed token reuse. revoked_at represents refresh-token revocation, including rotation and reuse-triggered family revocation.
+
+---
+
+## Email Verification Tokens
+
+Supports single-use email verification.
+
+Raw verification tokens are never stored. Only the cryptographic hash of the token is stored.
+
+Fields:
+
+- id
+- user_id
+- token_hash
+- expires_at
+- used_at
+- created_at
+
+used_at represents single-use token consumption. Verification tokens expire 24 hours after creation.
+
+---
+
+## Password Reset Tokens
+
+Supports single-use password reset.
+
+Raw reset tokens are never stored. Only the cryptographic hash of the token is stored.
+
+Fields:
+
+- id
+- user_id
+- token_hash
+- expires_at
+- used_at
+- created_at
+
+used_at represents single-use token consumption. Password reset tokens expire 1 hour after creation.
+
 ---
 
 ## Roles
@@ -410,7 +470,10 @@ Organization
 
 User
 │
-└── Organization Memberships
+├── Organization Memberships
+├── Refresh Tokens
+├── Email Verification Tokens
+└── Password Reset Tokens
 
 Role
 │
@@ -472,6 +535,7 @@ Create indexes for:
 - event_id
 - person_id
 - created_at
+- user_id and token_hash (Refresh Tokens, Email Verification Tokens, Password Reset Tokens)
 (organization_id, user_id)
 
 (organization_id, event_id, person_id)
@@ -523,6 +587,7 @@ The database should:
 - Required fields should use NOT NULL.
 - Organization Membership must be unique per (organization_id, user_id).
 - Attendance must be unique per (organization_id, event_id, person_id). This is the database-level attendance idempotency / duplicate-prevention boundary.
+- token_hash must be unique within Refresh Tokens, within Email Verification Tokens, and within Password Reset Tokens.
 
 UUID v4 should be used for all primary keys.
 # End of Document

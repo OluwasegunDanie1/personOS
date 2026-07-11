@@ -94,6 +94,10 @@ Session refresh
 Logout
 Session expiration
 
+User status is a closed v1 value set: ACTIVE, DISABLED. Disabled users cannot authenticate. Disabled users cannot refresh authentication.
+
+Login failures caused by an invalid email or an invalid password must return the same public authentication failure. The response must not reveal which factor was incorrect.
+
 Future authentication methods may include:
 
 Google Sign-In
@@ -110,12 +114,9 @@ Passwords must never be stored in plain text.
 
 Passwords must be hashed using a modern password hashing algorithm.
 
-Approved approaches include:
+The approved v1 algorithm is Argon2id, using the secure defaults of the approved Argon2 implementation.
 
-Argon2id
-bcrypt
-
-Argon2id is preferred where supported by the approved backend stack.
+Hash configuration must be centralized. Algorithm parameters must not be scattered through authentication code.
 
 Password hashes must never be returned by the API.
 
@@ -141,14 +142,15 @@ Example response:
 
 If an account exists for this email, password reset instructions will be sent.
 
+Reset tokens are opaque, cryptographically secure random values. Only a cryptographic hash of the reset token may be stored; the raw token must never be stored.
+
 Reset tokens must:
 
 Be cryptographically secure
-Expire
-Be single-use where practical
+Expire 1 hour after creation
+Be single-use
 Be invalidated after successful reset
 Never be logged
-Never be stored in plain text where a secure token-hash design is applicable
 
 Password reset operations should be rate limited.
 
@@ -156,12 +158,14 @@ A successful password reset should consider invalidating existing sessions accor
 
 Email Verification
 
+Email verification tokens are opaque, cryptographically secure random values. Only a cryptographic hash of the verification token may be stored; the raw token must never be stored.
+
 Email verification tokens must:
 
 Be securely generated
-Expire
+Expire 24 hours after creation
+Be single-use
 Be validated by the backend
-Be protected from reuse where applicable
 
 The backend must determine whether an email is verified.
 
@@ -171,9 +175,9 @@ Session Security
 
 Authentication state must have a single authoritative backend source.
 
-Access tokens should be short-lived.
+Access tokens are signed JWTs with a 15-minute lifetime. Access JWTs must never be persisted in PostgreSQL.
 
-Refresh tokens or approved secure sessions should be used for session renewal.
+Refresh tokens are used for session renewal (see Refresh Token Security).
 
 Authentication material must never be stored in insecure plain-text application storage.
 
@@ -199,17 +203,21 @@ When authentication can no longer be refreshed safely, the application must retu
 
 Refresh Token Security
 
-If refresh tokens are used, they must:
+Refresh tokens are opaque, cryptographically secure random values with a 30-day lifetime. Only a cryptographic hash of the refresh token may be stored in PostgreSQL. The raw refresh token must never be stored.
+
+Refresh tokens must:
 
 Be securely generated
-Be stored securely
+Be stored only as a hash
 Support revocation
-Have defined expiration
+Have a defined 30-day expiration
 Be validated server-side
 
-Refresh token rotation is recommended.
+Refresh tokens rotate on every successful refresh.
 
-When rotation is implemented, reuse of an invalidated refresh token should be treated as suspicious.
+Reuse of an already rotated or revoked refresh token is treated as suspicious and revokes the entire refresh-token family.
+
+Logout revokes the active refresh-token session.
 
 Refresh tokens must never be exposed through application logs.
 
@@ -294,6 +302,8 @@ Different roles in different organizations
 Role and permission context must be evaluated per organization.
 
 Membership is represented by an Organization Membership record linking a User, an Organization, and a Role. A user has at most one Organization Membership per organization. A membership's role must belong to the same organization as the membership.
+
+Login does not automatically select an active Organization context. Organization context selection is a separate explicit membership/context workflow.
 
 Example:
 
@@ -512,6 +522,10 @@ Rate limiting
 Progressive delays
 Temporary protection mechanisms
 Suspicious login monitoring
+
+Persistent account lockout is not part of Relvio v1. Do not add failed-attempt counters or locked-until fields.
+
+Rate limiting and brute-force protection remain required. Exact rate-limit thresholds are not decided in this task and must be resolved before public authentication exposure.
 
 Security controls must avoid exposing whether a specific email account exists.
 
