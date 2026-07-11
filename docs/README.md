@@ -1,268 +1,101 @@
-# Atlas
+# Relvio
 
-> A modern platform for managing people, attendance, follow-ups, events, and engagement across organizations.
+> Build stronger relationships.
 
----
+Relvio is a People Operating System for people-centered organizations.
 
-## Overview
-
-Atlas is a multi-tenant SaaS platform designed to help organizations manage their people from a single, unified workspace.
-
-Instead of relying on spreadsheets, paper records, messaging apps, and disconnected tools, Atlas centralizes everything into one intuitive platform.
-
-Although the first release targets churches, Atlas is designed to support many types of organizations, including schools, NGOs, businesses, associations, communities, and event organizers.
+It helps organizations understand people, coordinate meaningful follow-up, manage core relationship workflows, and support organizational growth through a connected product experience.
 
 ---
 
-## Vision
+## Product Context
 
-To become the operating system for organizations that manage people.
+Relvio is a multi-tenant SaaS product.
 
----
+Churches and similar organizations are an important initial validation market.
 
-## Mission
+The core product remains organization-neutral.
 
-Help organizations build stronger relationships through better organization, smarter workflows, and actionable insights.
+Relvio must not be hardcoded as a church-only product unless an explicitly approved product requirement requires market-specific behavior.
 
----
+The public product name is:
 
-## Core Features
+**Relvio**
 
-### Authentication
+Atlas was an internal early codename.
 
-- Secure Login
-- Registration
-- Email Verification
-- Password Reset
+Do not use Atlas in production UI, customer-facing copy, new implementation naming, or new documentation unless historical context explicitly requires it.
 
 ---
 
-### Organization Management
+## Product Direction
 
-- Multi-tenant architecture
-- Organization settings
-- Branding
-- Team management
+Relvio exists to help people-centered organizations build stronger relationships.
 
----
+The product focuses on approved people and relationship workflows represented by the frozen Relvio v1 mobile UI and approved product documentation.
 
-### People Management
+Core v1 responsibility areas include:
 
-- Member profiles
-- Visitor management
-- Custom tags
-- Notes
-- Search & filters
+- Secure product access
+- Authorized organization access
+- People workflows
+- Journey workflows
+- Event responsibilities
+- Attendance
+- Follow-ups
+- Approved product insights
+- Workspace responsibilities
 
----
+These responsibility areas do not independently define screens, API endpoints, database tables, fields, routes, or Flutter folders.
 
-### Journey Engine
-
-Track a person's progression through customizable stages.
-
-Example:
-
-Visitor
-
-↓
-
-First Visit
-
-↓
-
-Follow-up
-
-↓
-
-Member
-
-↓
-
-Volunteer
-
-↓
-
-Leader
+The relevant approved documentation controls implementation details.
 
 ---
 
-### Events
+## Approved v1 Platforms
 
-- Event creation
-- Calendar
-- Event categories
-- Attendance tracking
+Relvio v1 product platforms are:
 
----
+- Android
+- iOS
 
-### Attendance
+The frontend is implemented with Flutter.
 
-- Manual check-in
-- Attendance history
-- Future QR check-in support
+This project does not currently approve:
 
----
+- Web application support
+- Desktop application support
+- Additional client platforms
 
-### Follow-ups
-
-- Assign follow-up tasks
-- Due dates
-- Status tracking
-- Activity history
+Do not create infrastructure for unapproved platforms.
 
 ---
 
-### Reports
-
-- Attendance reports
-- Growth reports
-- Journey reports
-- Follow-up reports
-- Export to PDF, Excel, and CSV
-
----
-
-### Notifications
-
-- In-app notifications
-- Task reminders
-- Event reminders
-
----
-
-## Technology Stack
+## Approved Technology Direction
 
 ### Frontend
 
 - Flutter
 - Riverpod
 - GoRouter
-- Dio
-- Freezed
 
 ### Backend
 
-- REST API
+- Backend REST API
+
+### Database
+
 - PostgreSQL
 
-### Storage
+API base:
 
-- Cloud Storage
+`/api/v1`
 
----
+Approved architecture:
 
-## Architecture
-
-Atlas follows a modular architecture.
-
-```
-lib/
-
-├── core/
-├── shared/
-├── features/
-│   ├── auth/
-│   ├── dashboard/
-│   ├── people/
-│   ├── events/
-│   ├── attendance/
-│   ├── followups/
-│   ├── reports/
-│   └── settings/
-│
-└── app/
-```
-
----
-
-## Project Status
-
-Current Stage
-
-**Planning & Architecture**
-
-Completed:
-
-- Product Strategy
-- PRD
-- Market Research
-- Competitor Analysis
-- User Personas
-- User Journeys
-- Information Architecture
-- Design System
-- System Architecture
-- Database Design
-- API Specification
-- Engineering Standards
-- Testing Strategy
-- Security Plan
-- Product Roadmap
-- Decision Log
-
-Next Phase:
-
-- Branding
-- Logo Design
-- UI/UX Design
-- Wireframes
-- MVP Development
-
----
-
-## Development Principles
-
-Atlas is built around five principles:
-
-- Simplicity
-- Scalability
-- Reliability
-- Performance
-- Great User Experience
-
-Every feature should solve a real customer problem.
-
----
-
-## Documentation
-
-Project documentation is located in the `/docs` directory.
-
-```
-docs/
-
-├── Product Strategy.md
-├── PRD.md
-├── Market Research.md
-├── Competitor Analysis.md
-├── User Personas.md
-├── User Journeys.md
-├── Information Architecture.md
-├── Design System.md
-├── System Architecture.md
-├── Database Design.md
-├── API Specification.md
-├── Engineering Standards.md
-├── Testing Strategy.md
-├── Security.md
-├── Roadmap.md
-└── Decision Log.md
-```
-
----
-
-## License
-
-Private Project
-
-All rights reserved.
-
----
-
-## Author
-
-Built with ❤️ to help organizations manage people better.
-
----
-
-*"Manage People. Build Relationships. Grow Together."*
+```text
+Flutter
+↓
+Backend REST API
+↓
+PostgreSQL

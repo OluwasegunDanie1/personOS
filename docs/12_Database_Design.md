@@ -2,7 +2,7 @@
 Document: Database Design
 Version: 0.1
 Status: Draft
-Project: Atlas (Codename)
+Project: Relvio
 Owner: Engineering Team
 ---
 
@@ -76,7 +76,7 @@ Fields:
 - first_name
 - last_name
 - email
-- password
+- password_hash
 - phone
 - role_id
 - status
@@ -104,6 +104,12 @@ Examples:
 - Volunteer
 - Viewer
 
+## Role Permissions
+
+Fields:
+
+- role_id
+- permission_id
 ---
 
 ## Permissions
@@ -175,6 +181,8 @@ Fields:
 - person_id
 - tag_id
 
+(person_id, tag_id)
+
 ---
 
 ## Journey Templates
@@ -229,11 +237,12 @@ Fields:
 
 - id
 - person_id
-- from_stage
-- to_stage
+- from_stage_id
+- to_stage_id
 - moved_by
 - moved_at
 - notes
+
 
 ---
 
@@ -263,7 +272,7 @@ Fields:
 - status
 - checked_in_by
 - checked_in_at
-
+- organization_id
 Status:
 
 - Present
@@ -299,6 +308,7 @@ Fields:
 - user_id
 - note
 - created_at
+- organization_id
 
 ---
 
@@ -407,6 +417,7 @@ Examples:
 - People
 - Events
 - Users
+deleted_at TIMESTAMP NULL
 
 This prevents accidental data loss.
 
@@ -422,8 +433,16 @@ Create indexes for:
 - event_id
 - person_id
 - created_at
+(organization_id, email)
+
+(organization_id, person_id)
+
+(organization_id, event_id)
+
+(organization_id, created_at)
 
 This improves query performance.
+
 
 ---
 
@@ -455,4 +474,12 @@ The database should:
 
 ---
 
+# Constraints
+
+- Email should be unique within an organization.
+- Slug should be globally unique.
+- Foreign keys must enforce referential integrity.
+- Required fields should use NOT NULL.
+
+UUID v4 should be used for all primary keys.
 # End of Document

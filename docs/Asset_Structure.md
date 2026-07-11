@@ -1,7 +1,7 @@
 ---
 Document: Asset Structure
-Version: 1.0
-Status: Draft
+Version: 1.1
+Status: Approved
 Project: Relvio
 Owner: Engineering & Design
 ---
@@ -10,305 +10,701 @@ Owner: Engineering & Design
 
 ## Purpose
 
-This document defines how all design assets, icons, illustrations, fonts, and images are organized within the Relvio project.
+This document defines how visual assets, icons, illustrations, fonts, images, and animation assets are organized within the Relvio project.
 
-A consistent asset structure improves maintainability, scalability, and collaboration between designers and developers.
+The goal is to keep assets predictable, reusable, optimized, and easy for developers and AI coding assistants to locate.
+
+This document is the source of truth for asset organization.
 
 ---
 
-# Principles
+# Asset Principles
 
-Assets should be:
+Relvio assets must be:
 
 - Organized
 - Reusable
 - Optimized
-- Versioned
+- Predictably named
 - Easy to locate
+- Production-ready
 
 Avoid duplicate assets.
 
+Do not create multiple versions of the same asset without a documented reason.
+
 ---
 
-# Project Structure
+# Flutter Asset Structure
 
-```
+The approved Flutter asset structure is:
+
+```text
 assets/
-
 ├── branding/
 │   ├── logos/
+│   │   ├── relvio_logo_primary.svg
+│   │   ├── relvio_logo_horizontal.svg
+│   │   ├── relvio_logo_stacked.svg
+│   │   ├── relvio_symbol.svg
+│   │   ├── relvio_logo_white.svg
+│   │   └── relvio_logo_black.svg
+│   │
 │   ├── app_icon/
+│   │   ├── relvio_app_icon.png
+│   │   ├── relvio_app_icon_foreground.png
+│   │   └── relvio_app_icon_background.png
+│   │
 │   ├── favicon/
+│   │   └── relvio_favicon.svg
+│   │
 │   └── splash/
+│       └── relvio_splash_logo.svg
 │
 ├── icons/
-│   ├── outline/
-│   ├── filled/
 │   └── custom/
 │
 ├── illustrations/
 │   ├── onboarding/
 │   ├── empty_states/
 │   ├── errors/
-│   └── marketing/
+│   └── system/
 │
 ├── images/
 │   ├── avatars/
 │   ├── placeholders/
-│   ├── backgrounds/
-│   ├── banners/
+│   ├── event_covers/
 │   └── demo/
 │
 ├── animations/
-│   ├── lottie/
-│   └── rive/
 │
-├── fonts/
-│
-├── mockups/
-│
-└── flags/
-```
+└── fonts/
 
----
 
-# Branding
 
-Contains:
+Folders should only contain production assets used by the application.
 
-- Primary Logo
-- Secondary Logo
-- White Logo
-- Black Logo
-- SVG Files
-- PNG Files
+Do not create empty asset categories simply because they may be useful in the future.
 
----
+Branding Assets
 
-# App Icon
+The branding/ directory contains approved Relvio brand assets.
 
-Contains:
+These assets are controlled brand files.
 
-- Android Icon
-- iOS Icon
-- Adaptive Icon
-- Foreground
-- Background
-- Play Store Assets
+They must not be recreated from screenshots.
 
----
+They must not be approximated using Flutter widgets, text, icons, or custom drawing code.
 
-# Icons
+Logo Assets
 
-Official application icons.
+Approved logo files belong in:
 
-Requirements:
+assets/branding/logos/
 
-- SVG format
-- Consistent stroke width
-- Optimized for Flutter
+Expected assets include:
 
----
+relvio_logo_primary.svg
+relvio_logo_horizontal.svg
+relvio_logo_stacked.svg
+relvio_symbol.svg
+relvio_logo_white.svg
+relvio_logo_black.svg
 
-# Illustrations
+Only include a logo variation when the approved asset actually exists.
 
-Organized into:
+Do not generate fake logo variations to satisfy this file list.
 
-## Onboarding
+If an expected logo asset is unavailable, report the missing asset.
 
-Welcome screens.
+The approved logo rules are defined in:
 
----
+20_Logo_Strategy.md
+Logo Source Rule
 
-## Empty States
+The approved Relvio logo is a fixed brand asset.
 
-Examples
+Developers and AI coding assistants must:
 
-- No People
-- No Events
-- No Reports
-- No Notifications
-
----
-
-## Errors
-
-Examples
-
-- 404
-- Offline
-- Server Error
-
----
-
-## Marketing
-
-Used for:
-
-- Landing Page
-- Blog
-- Social Media
-- Documentation
-
----
-
-# Images
-
-Should include:
-
-- Team Photos
-- Demo Images
-- Placeholder Images
-- Organization Covers
-
-Optimize before committing.
-
----
-
-# Fonts
-
-Store only licensed fonts.
-
-Primary
-
-Inter
-
-Future fonts should include license documentation.
-
----
-
-# Animations
-
-Supported formats:
-
-- Lottie
-- Rive
-
-Avoid GIF animations.
-
----
-
-# File Naming
-
-Good
-
-```
-logo_primary.svg
-
-logo_white.svg
-
-dashboard_empty.png
-
-user_placeholder.png
-```
-
-Avoid
-
-```
-logo-new-final2.png
-
-image1.png
-
-test.png
-```
-
----
-
-# Image Formats
-
-Use:
-
-SVG
-
-- Logos
-- Icons
-- Simple graphics
-
-PNG
-
-- Transparent assets
-
-WebP
-
-- Product images
-- Marketing assets
-
-JPEG
-
-- Photography
-
----
-
-# Optimization
-
-Every image should be optimized before use.
-
-Avoid unnecessarily large files.
-
----
-
-# Asset Guidelines
+Locate the approved logo asset.
+Use the asset directly.
+Preserve the aspect ratio.
+Follow the documented logo usage rules.
+Report missing assets.
 
 Never:
 
-- Duplicate assets
-- Upload unoptimized images
-- Mix naming styles
-- Commit temporary exports
+Trace the logo from a UI screenshot
+Recreate the logo with Flutter CustomPainter
+Replace the symbol with a typed R
+Approximate the logo with an icon
+Redesign the logo
+App Icon Assets
 
----
+Application icon source assets belong in:
 
-# Versioning
+assets/branding/app_icon/
 
-When replacing assets:
+The app icon is based on the approved Relvio brand symbol.
 
-- Archive old versions
-- Keep filenames consistent
-- Update documentation if necessary
+Source files may include:
 
----
+relvio_app_icon.png
+relvio_app_icon_foreground.png
+relvio_app_icon_background.png
 
-# Flutter Integration
+Platform-generated launcher icons should remain in their respective Android and iOS platform directories.
 
-Reference assets using centralized constants.
+Do not manually duplicate every generated launcher icon inside assets/.
 
-Example
+The assets/branding/app_icon/ directory stores source assets only.
 
-```
-AppAssets.logo
+Favicon
 
-AppAssets.emptyPeople
+The approved favicon source belongs in:
 
-AppAssets.iconAttendance
-```
+assets/branding/favicon/
 
-Avoid hardcoding file paths throughout the project.
+Preferred file:
 
----
+relvio_favicon.svg
 
-# Git Rules
+Flutter Web generated or platform-specific favicon files may remain inside the web platform directory where required.
 
-Commit only production-ready assets.
+Splash Assets
 
-Exclude:
+Splash branding assets belong in:
 
-- Temporary exports
-- Design experiments
-- AI prompt files
-- Scratch artwork
+assets/branding/splash/
 
----
+The splash screen uses the approved Relvio identity.
 
-# Success Criteria
+The splash asset must not include the complete screen background as one large screenshot.
 
-The asset structure is successful when:
+Flutter should implement:
 
-- Every asset has a predictable location.
-- Naming is consistent.
-- Flutter developers can find assets easily.
-- Designers can update assets without confusion.
-- The project remains clean as it grows.
+Background
+Positioning
+Responsive layout
+Animation
 
----
+The asset should contain only the approved brand artwork required by the splash experience.
 
-# End of Document
+Icons
+
+Relvio should prefer a consistent Flutter-compatible icon system for standard interface icons.
+
+Standard icons should not be exported as individual image assets unless required by the design.
+
+Examples include:
+
+Search
+Filter
+Calendar
+Person
+Settings
+Chevron
+Close
+Add
+Edit
+
+These should use the approved icon package or icon system selected during implementation.
+
+Custom Relvio-specific icons belong in:
+
+assets/icons/custom/
+
+Use SVG for custom vector icons whenever practical.
+
+Do not mix multiple icon styles without an approved design reason.
+
+Custom Icon Requirements
+
+Custom icons must:
+
+Match the Relvio visual language
+Use consistent stroke treatment
+Scale cleanly
+Remain recognizable at mobile sizes
+Be optimized before inclusion
+
+Custom icons should not be created when an approved standard icon already communicates the action clearly.
+
+Illustrations
+
+Illustration assets belong in:
+
+assets/illustrations/
+
+Approved categories are:
+
+onboarding/
+empty_states/
+errors/
+system/
+Onboarding Illustrations
+
+Onboarding assets belong in:
+
+assets/illustrations/onboarding/
+
+These may include connected orbital systems, product icons, nodes, and relationship paths.
+
+The downloaded high-fidelity UI screens are visual references.
+
+They are not production illustration assets.
+
+Do not crop illustrations directly from UI screenshots for application use.
+
+Production illustrations should be exported or recreated as dedicated approved assets.
+
+Empty State Illustrations
+
+Empty-state assets belong in:
+
+assets/illustrations/empty_states/
+
+Examples may include:
+
+empty_people.svg
+empty_events.svg
+empty_messages.svg
+empty_notifications.svg
+empty_reports.svg
+
+Only add assets for implemented product states.
+
+Do not generate unused empty-state artwork in advance.
+
+Error Illustrations
+
+Error-state assets belong in:
+
+assets/illustrations/errors/
+
+Possible assets include:
+
+offline.svg
+server_error.svg
+not_found.svg
+
+Error-state behavior may be implemented during development.
+
+Dedicated illustration assets are optional unless required by the approved design.
+
+Do not block feature development because an optional error illustration is unavailable.
+
+System Illustrations
+
+System-level product illustrations belong in:
+
+assets/illustrations/system/
+
+Examples include:
+
+Organization ready state
+Setup completion state
+Success illustrations
+Relationship system graphics
+
+These assets should follow the approved Relvio design language.
+
+Images
+
+Image assets belong in:
+
+assets/images/
+
+Approved categories are:
+
+avatars/
+placeholders/
+event_covers/
+demo/
+Avatars
+
+Demo or development avatar assets belong in:
+
+assets/images/avatars/
+
+These are intended for:
+
+Local development
+UI previews
+Demo data
+Testing
+
+Production user profile photos should come from the configured storage system.
+
+Do not bundle real customer profile images into the application.
+
+Placeholders
+
+Placeholder assets belong in:
+
+assets/images/placeholders/
+
+Examples include:
+
+avatar_placeholder.svg
+event_cover_placeholder.svg
+organization_logo_placeholder.svg
+
+Prefer lightweight vector placeholders where appropriate.
+
+Event Covers
+
+Bundled demonstration event covers belong in:
+
+assets/images/event_covers/
+
+Production event covers should be loaded from remote storage.
+
+Bundled event covers should only support:
+
+Demo mode
+Development
+Testing
+Approved default templates
+Demo Assets
+
+Demo-specific assets belong in:
+
+assets/images/demo/
+
+Demo assets must not be confused with production customer data.
+
+Do not place temporary screenshots or random development images in this directory.
+
+Fonts
+
+Font assets belong in:
+
+assets/fonts/
+
+The approved Relvio product typeface is:
+
+Inter
+
+Only required font weights should be bundled.
+
+Do not include every available Inter font file automatically.
+
+The implementation should include only the weights required by the approved typography system.
+
+Font usage rules are defined in:
+
+Typography.md
+
+Only licensed fonts may be committed to the repository.
+
+Animations
+
+Animation assets belong in:
+
+assets/animations/
+
+Relvio animations should preferably be implemented directly in Flutter when the motion is simple.
+
+Examples include:
+
+Fade transitions
+Scale transitions
+Button feedback
+Shimmer loading
+Skeleton loading
+Progress movement
+Logo reveal
+Node appearance
+
+Do not create animation files for interactions that Flutter can implement cleanly.
+
+External animation formats should only be introduced when a specific approved animation requires them.
+
+Do not add Lottie or Rive as a dependency by default.
+
+Adding an animation dependency requires an engineering decision.
+
+UI Reference Screens
+
+Downloaded high-fidelity Relvio UI screens are design references.
+
+They should not be stored inside the Flutter production assets/ directory unless there is a documented development reason.
+
+Recommended project documentation location:
+
+docs/ui_reference/
+
+or:
+
+design/ui_reference/
+
+These files may be used by developers and AI coding assistants to understand:
+
+Layout
+Spacing
+Visual hierarchy
+Component composition
+Screen structure
+
+They must not be displayed directly as application screens.
+
+Do not implement Relvio by placing full-screen UI screenshots inside Flutter.
+
+Asset File Naming
+
+All asset filenames must use:
+
+snake_case
+
+Good examples:
+
+relvio_symbol.svg
+empty_people.svg
+avatar_placeholder.svg
+sunday_service_cover.webp
+organization_ready.svg
+
+Avoid:
+
+logo-new-final2.png
+RelvioLogo.svg
+image1.png
+test.png
+new_logo_latest.svg
+final-final-logo.png
+
+Filenames should describe the asset clearly.
+
+Image Formats
+
+Use the following format guidance.
+
+SVG
+
+Preferred for:
+
+Logos
+Custom icons
+Illustrations
+Simple vector graphics
+Placeholders
+PNG
+
+Use for:
+
+Transparent raster assets
+App icon source files
+Assets requiring lossless raster output
+WebP
+
+Preferred for:
+
+Event covers
+Demo images
+Product imagery
+Optimized bundled raster images
+JPEG
+
+Use primarily for photography when WebP is not appropriate.
+
+Screenshot Rule
+
+Screenshots are documentation and reference assets.
+
+Do not use screenshots as production UI assets.
+
+Do not crop:
+
+Buttons
+Cards
+Inputs
+Navigation bars
+Icons
+Text
+Forms
+
+from screenshots and place them inside the Flutter application.
+
+These elements must be implemented as Flutter widgets.
+
+Asset Optimization
+
+Every production asset must be optimized before inclusion.
+
+Check:
+
+File size
+Image dimensions
+Transparency
+Compression
+Visual quality
+
+Avoid bundling unnecessarily large files.
+
+Large source artwork should not automatically be included in the application package.
+
+Duplicate Asset Rule
+
+Before adding an asset:
+
+Search the existing asset directories.
+Check whether an equivalent asset already exists.
+Reuse the existing asset when appropriate.
+Add a new asset only when it has a distinct purpose.
+
+Do not create duplicate files with different names.
+
+Asset Versioning
+
+Git provides version history for production assets.
+
+Do not archive old asset versions inside the active Flutter asset directories.
+
+Avoid:
+
+relvio_logo_old.svg
+relvio_logo_v2.svg
+relvio_logo_final.svg
+relvio_logo_final_new.svg
+
+When an approved asset is replaced:
+
+Replace the source asset.
+Preserve the canonical filename when appropriate.
+Commit the change.
+Document major brand changes in the Decision Log.
+
+Historical assets may be stored outside the active application asset structure when required.
+
+Flutter Asset Registration
+
+Asset directories must be registered correctly in:
+
+pubspec.yaml
+
+Do not register undocumented temporary folders.
+
+Only production asset paths required by the application should be included.
+
+Centralized Asset References
+
+Flutter code must reference application assets through centralized constants.
+
+Example:
+
+abstract final class AppAssets {
+  static const String relvioSymbol =
+      'assets/branding/logos/relvio_symbol.svg';
+
+  static const String emptyPeople =
+      'assets/illustrations/empty_states/empty_people.svg';
+
+  static const String avatarPlaceholder =
+      'assets/images/placeholders/avatar_placeholder.svg';
+}
+
+Use:
+
+AppAssets.relvioSymbol
+
+Avoid:
+
+'assets/branding/logos/relvio_symbol.svg'
+
+throughout feature widgets.
+
+Asset Constant Rules
+
+Asset constants should:
+
+Use camelCase
+Describe the asset clearly
+Point to one canonical asset path
+Remain centralized
+
+Do not create separate asset constant classes inside every feature unless there is a documented architectural reason.
+
+Missing Asset Rule
+
+If implementation requires an asset that does not exist:
+
+Confirm the asset is required by the approved design.
+Search the approved asset structure.
+Check the brand asset documentation.
+Report the missing asset.
+
+Do not invent a replacement.
+
+Do not download random artwork.
+
+Do not recreate approved brand assets from screenshots.
+
+Standard Flutter UI icons may use the approved icon system and are not considered missing brand assets.
+
+AI Coding Assistant Guardrail
+
+Before using an asset, AI coding assistants must:
+
+Inspect the documented asset structure.
+Locate the existing asset.
+Confirm its intended purpose.
+Use the centralized asset reference.
+Preserve approved brand assets.
+
+AI coding assistants must not:
+
+Invent asset paths
+Create duplicate assets
+Recreate the Relvio logo
+Crop UI screenshots into assets
+Add random internet images
+Add animation dependencies without approval
+Generate unused placeholder assets
+Rename approved assets without updating documentation and references
+
+If a required approved asset is missing, report it before implementation.
+
+Git Rules
+
+Commit only production-ready application assets.
+
+Do not commit to active asset directories:
+
+Temporary exports
+Design experiments
+AI prompt files
+Scratch artwork
+Full UI reference screenshots
+Duplicate files
+Unoptimized source files
+
+Use appropriate documentation or design directories for non-production references.
+
+Related Documents
+
+This document should be used together with:
+
+19_Brand_Identity.md
+20_Logo_Strategy.md
+Brand Assets.md
+Color_System.md
+Typography.md
+Iconography.md
+Design_Tokens.md
+
+These documents define the visual rules governing Relvio assets.
+
+Success Criteria
+
+The Relvio asset structure is successful when:
+
+Every production asset has a predictable location.
+Approved brand assets are protected.
+Asset naming is consistent.
+Duplicate assets are avoided.
+Flutter code uses centralized asset references.
+UI screenshots remain references rather than production assets.
+Developers can locate assets quickly.
+AI coding assistants do not invent or recreate approved assets.
+The application package contains only necessary production assets.

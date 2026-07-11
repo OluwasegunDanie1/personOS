@@ -1,8 +1,8 @@
 ---
 Document: Decision Log
-Version: 1.0
+Version: 1.1
 Status: Active
-Project: Atlas (Codename)
+Project: Atlas (Codename) / Relvio
 Owner: Product Team
 ---
 
@@ -10,349 +10,1104 @@ Owner: Product Team
 
 ## Purpose
 
-This document records important product and engineering decisions made during the development of Atlas.
+This document records significant product, design, engineering, architecture, and business decisions made during the development of Relvio.
 
-The goal is to document **why** a decision was made, not just **what** was decided.
+The goal is to document why a decision was made, not only what was decided.
 
-This helps future contributors understand the reasoning behind the product and prevents revisiting the same discussions repeatedly.
+This helps future contributors and AI coding assistants understand the reasoning behind the product and prevents previously resolved decisions from being repeatedly reopened without new evidence.
 
----
+The Decision Log is historical.
 
-# Decision Template
-
-Use this format for every new decision.
+Approved decisions must not be silently deleted or rewritten when direction changes.
 
 ---
 
-## Decision #
+# Decision Status
 
-**Date**
+Every decision must use one of the following statuses:
+
+```text
+Approved
+Deferred
+Rejected
+Replaced
+
+
+Approved
+
+The decision is currently active.
+
+Deferred
+
+The decision may be reconsidered later.
+
+Rejected
+
+The decision was considered and intentionally not selected.
+
+Replaced
+
+A newer decision supersedes the decision.
+
+When a decision is replaced, the original entry must remain in this document.
+
+Decision Template
+
+Use this format for every significant new decision.
+
+Decision XXX
+
+Date
 
 YYYY-MM-DD
 
-**Category**
+Category
 
-Product / Design / Engineering / Business
+Product / Design / Engineering / Architecture / Database / API / Security / Business
 
-**Decision**
+Decision
 
-...
+Describe the decision.
 
-**Reason**
+Reason
 
-...
+Explain why the decision was made.
 
-**Alternatives Considered**
+Alternatives Considered
 
-- Option A
-- Option B
-- Option C
+Option A
+Option B
+Option C
 
-**Status**
+Related Decisions
+
+Decision XXX
+
+Status
 
 Approved | Deferred | Rejected | Replaced
 
----
+Decision 001
 
-# Decision 001
-
-**Date**
+Date
 
 2026-07-10
 
-**Category**
+Category
 
 Product
 
-**Decision**
+Decision
 
 Atlas will be built as a multi-tenant SaaS platform.
 
-**Reason**
+Reason
 
-A single platform serving multiple organizations is easier to maintain and scale.
+A single platform serving multiple organizations is easier to maintain, operate, and scale than separate deployments for every organization.
 
-**Alternatives Considered**
+The platform must preserve strict organization data isolation.
 
-- Separate application for every organization
-- Self-hosted installations
+Alternatives Considered
 
-**Status**
+Separate application for every organization
+Self-hosted installations
+
+Related Decisions
+
+Decision 003
+Decision 006
+
+Status
 
 Approved
 
----
+Decision 002
 
-# Decision 002
-
-**Date**
+Date
 
 2026-07-10
 
-**Category**
+Category
 
 Product
 
-**Decision**
+Decision
 
-The first target market will be churches.
+Churches will be treated as a strong initial validation market.
 
-**Reason**
+Reason
 
-Churches have a clear need for attendance tracking, follow-ups, and member management, making them an ideal market for validating the product.
+Churches have clear people-management, attendance, follow-up, and engagement problems that align strongly with the product's core capabilities.
 
-**Alternatives Considered**
+They provide a practical early market for validating Relvio.
 
-- Schools
-- NGOs
-- Businesses
+This decision does not make Relvio a church-only product.
 
-**Status**
+Alternatives Considered
+
+Schools
+NGOs
+Businesses
+Broad multi-industry launch from day one
+
+Related Decisions
+
+Decision 003
+Decision 004
+
+Status
 
 Approved
 
----
+Decision 003
 
-# Decision 003
-
-**Date**
+Date
 
 2026-07-10
 
-**Category**
+Category
 
 Product
 
-**Decision**
+Decision
 
-Atlas will be designed to support multiple industries from the beginning.
+The platform will be designed as an organization-neutral People Operating System.
 
-**Reason**
+Reason
 
-The core problem of managing people and engagement exists across many organizations.
+The core problem of managing people, journeys, engagement, attendance, and organizational action exists across multiple organization types.
 
-**Alternatives Considered**
+The core architecture and product language should remain adaptable to:
 
-- Church-only platform
+Churches
+Ministries
+NGOs
+Communities
+Associations
+Schools
+Clubs
+People-centered businesses
 
-**Status**
+Industry-specific assumptions must not be hardcoded into the core platform without an approved product decision.
+
+Alternatives Considered
+
+Church-only platform
+Separate product for every industry
+
+Related Decisions
+
+Decision 001
+Decision 002
+Decision 004
+
+Status
 
 Approved
 
----
+Decision 004
 
-# Decision 004
-
-**Date**
+Date
 
 2026-07-10
 
-**Category**
+Category
 
 Product
 
-**Decision**
+Decision
 
-The Journey Engine will be a core feature of the platform.
+The Journey Engine will be a core product capability.
 
-**Reason**
+Reason
 
-People move through stages. Atlas should help organizations understand where someone is and what should happen next.
+People move through meaningful stages in their relationship with an organization.
 
-**Alternatives Considered**
+Relvio should help organizations understand:
 
-- Static member statuses
-- Fixed workflows
+Where a person currently is
+Where the person has been
+How the person's journey has changed
+What action may be required next
 
-**Status**
+Journey history must be preserved rather than represented only by a static status.
+
+Alternatives Considered
+
+Static member statuses
+Fixed workflows
+Tags only
+
+Related Decisions
+
+Decision 003
+Decision 014
+
+Status
 
 Approved
 
----
+Decision 005
 
-# Decision 005
-
-**Date**
+Date
 
 2026-07-10
 
-**Category**
+Category
 
 Engineering
 
-**Decision**
+Decision
 
-Flutter will be used for frontend development.
+Flutter will be used for Relvio client development.
 
-**Reason**
+Reason
 
-One codebase for Web, Android, iOS, Windows, macOS, and Linux.
+Flutter provides a strong development environment for building high-quality mobile applications from one shared codebase.
 
-**Alternatives Considered**
+Relvio v1 will prioritize:
 
-- React
-- React Native
+Android
+iOS
 
-**Status**
+Flutter's broader platform support may be considered later.
+
+The existence of Flutter web and desktop support does not place web or desktop applications inside Relvio v1 scope.
+
+Alternatives Considered
+
+Native Android and iOS applications
+React Native
+Web-first application
+
+Related Decisions
+
+Decision 011
+
+Status
 
 Approved
 
----
+Decision 006
 
-# Decision 006
-
-**Date**
+Date
 
 2026-07-10
 
-**Category**
+Category
 
 Database
 
-**Decision**
+Decision
 
-PostgreSQL will be the primary database.
+PostgreSQL will be the primary relational database.
 
-**Reason**
+Reason
 
-Reliable, scalable, and well suited for relational data.
+Relvio contains strongly relational data including:
 
-**Alternatives Considered**
+Organizations
+Memberships
+People
+Journey stages
+Journey history
+Communities
+Events
+Attendance
+Follow-ups
+Roles
+Permissions
 
-- MySQL
-- MongoDB
+PostgreSQL provides reliable relational integrity, transactions, constraints, and mature indexing capabilities.
 
-**Status**
+Alternatives Considered
+
+MySQL
+MongoDB
+Cloud Firestore
+
+Related Decisions
+
+Decision 001
+Decision 007
+Decision 013
+
+Status
 
 Approved
 
----
+Decision 007
 
-# Decision 007
-
-**Date**
+Date
 
 2026-07-10
 
-**Category**
+Category
 
 API
 
-**Decision**
+Decision
 
-The backend will expose REST APIs.
+The backend will expose versioned REST APIs.
 
-**Reason**
+Reason
 
-REST is simple, widely supported, and sufficient for the MVP.
+REST is predictable, widely supported, straightforward for the Flutter application to consume, and sufficient for Relvio v1.
 
-**Alternatives Considered**
+The approved API base version is:
 
-- GraphQL
-- gRPC
+/api/v1
 
-**Status**
+Breaking API changes require an appropriate versioning decision.
+
+Alternatives Considered
+
+GraphQL
+gRPC
+
+Related Decisions
+
+Decision 006
+Decision 013
+
+Status
 
 Approved
 
----
+Decision 008
 
-# Decision 008
-
-**Date**
+Date
 
 2026-07-10
 
-**Category**
+Category
 
 Business
 
-**Decision**
+Decision
 
-Atlas will use a subscription-based pricing model.
+Relvio will use a subscription-based business model.
 
-**Reason**
+Reason
 
-Recurring revenue supports continuous development and customer support.
+Recurring revenue better supports continuous product development, infrastructure, customer support, and long-term product maintenance.
 
-**Alternatives Considered**
+Pricing details may evolve based on product validation and market evidence.
 
-- One-time purchase
-- Lifetime license
+Alternatives Considered
 
-**Status**
+One-time purchase
+Lifetime license
+Advertising-supported model
+
+Related Decisions
+
+None
+
+Status
 
 Approved
 
----
+Decision 009
 
-# Decision 009
-
-**Date**
+Date
 
 2026-07-10
 
-**Category**
+Category
 
 Product
 
-**Decision**
+Decision
 
-The MVP will focus on solving core operational problems before adding advanced features.
+Relvio will prioritize approved core operational workflows before advanced roadmap features.
 
-**Reason**
+Reason
 
-Shipping early and gathering customer feedback is more valuable than building a large feature set before validation.
+Building the validated core product is more valuable than expanding into automation, enterprise capabilities, and integrations before real organizations use the platform.
 
-**Alternatives Considered**
+Roadmap ideas are not automatically approved implementation scope.
 
-- Large feature-rich first release
+Alternatives Considered
 
-**Status**
+Large feature-rich first release
+Building enterprise capabilities before validation
+Building integrations before core workflows
+
+Related Decisions
+
+Decision 016
+
+Status
 
 Approved
 
----
+Decision 010
 
-# Decision 010
-
-**Date**
+Date
 
 2026-07-10
 
-**Category**
+Category
 
 Design
 
-**Decision**
+Decision
 
-Atlas will prioritize simplicity over feature density.
+Relvio will prioritize simplicity, clarity, and calm visual hierarchy over feature density.
 
-**Reason**
+Reason
 
-Users should be able to learn the platform quickly with minimal training.
+People-centered organizations may include users with different levels of technical experience.
 
-**Alternatives Considered**
+The product should require minimal training for primary workflows.
 
-- Feature-heavy dashboards
-- Complex navigation
+The approved design direction draws inspiration from the product quality and simplicity associated with modern premium software while maintaining Relvio's own brand identity.
 
-**Status**
+Alternatives Considered
+
+Feature-heavy dashboards
+Dense enterprise navigation
+Highly decorative interfaces
+
+Related Decisions
+
+Decision 012
+
+Status
 
 Approved
 
----
+Decision 011
 
-# Updating Decisions
+Date
 
-If a decision changes:
+2026-07-10
 
-- Do not delete the original entry.
-- Create a new decision referencing the previous one.
-- Mark the previous decision as "Replaced".
+Category
 
-This preserves the history of the project.
+Product
 
----
+Decision
 
-# End of Document
+Relvio v1 will be a mobile-first product for Android and iOS.
+
+Reason
+
+The approved Relvio product workflows are strongly suited to mobile use.
+
+Examples include:
+
+People management
+Follow-ups
+Event operations
+Live attendance
+QR check-in
+Walk-in registration
+Communication
+Notifications
+
+The complete approved v1 UI has been designed as a mobile application.
+
+Alternatives Considered
+
+Building mobile and web simultaneously
+Web-first development
+Desktop-first development
+
+Related Decisions
+
+Decision 005
+
+Status
+
+Approved
+
+Decision 012
+
+Date
+
+2026-07-10
+
+Category
+
+Design
+
+Decision
+
+The approved Relvio v1 mobile UI will be frozen before implementation.
+
+Reason
+
+The complete Relvio mobile experience has been designed and approved.
+
+Freezing the UI prevents continuous redesign during engineering and allows implementation to focus on translating the approved product into Flutter.
+
+Changes are allowed only when:
+
+A genuine usability issue is discovered
+A technical constraint requires adjustment
+User testing identifies a meaningful problem
+
+Loading states, skeletons, shimmer, error states, empty states, micro-interactions, and appropriate animations may be implemented during Flutter development according to the approved design language.
+
+Alternatives Considered
+
+Redesigning screens during implementation
+Designing every technical state as a separate high-fidelity screen before coding
+
+Related Decisions
+
+Decision 010
+Decision 011
+
+Status
+
+Approved
+
+Decision 013
+
+Date
+
+2026-07-11
+
+Category
+
+Architecture
+
+Decision
+
+The Flutter application and PostgreSQL database will communicate through a dedicated backend API.
+
+Reason
+
+The backend must enforce:
+
+Authentication
+Organization membership
+Roles and permissions
+Business rules
+Validation
+Organization isolation
+Attendance integrity
+Journey history integrity
+
+The Flutter application must not connect directly to PostgreSQL.
+
+Alternatives Considered
+
+Direct database access from Flutter
+Client-controlled business rules
+Firebase-first database architecture
+
+Related Decisions
+
+Decision 001
+Decision 006
+Decision 007
+
+Status
+
+Approved
+
+Decision 014
+
+Date
+
+2026-07-11
+
+Category
+
+Database
+
+Decision
+
+Journey transitions will create immutable journey history records.
+
+Reason
+
+A person's journey is historical product data.
+
+Changing a person's current journey stage must not overwrite previous stage movement.
+
+Journey history is required for:
+
+Person timeline
+Relationship context
+Reporting
+Future automation
+Organizational insight
+
+Alternatives Considered
+
+Store only the current stage
+Overwrite the previous journey state
+Store journey changes only in generic application logs
+
+Related Decisions
+
+Decision 004
+Decision 006
+
+Status
+
+Approved
+
+Decision 015
+
+Date
+
+2026-07-11
+
+Category
+
+Architecture
+
+Decision
+
+Relvio will use Riverpod for Flutter state management and GoRouter for application routing.
+
+Reason
+
+Riverpod provides explicit, testable state management and dependency access suitable for the approved feature-first architecture.
+
+GoRouter provides declarative routing suitable for:
+
+Authentication redirects
+Onboarding flows
+Organization setup
+Protected application routes
+
+Alternatives Considered
+
+Provider
+Bloc
+GetX
+Navigator-only routing
+
+Related Decisions
+
+Decision 005
+Decision 011
+
+Status
+
+Approved
+
+Decision 016
+
+Date
+
+2026-07-11
+
+Category
+
+Engineering
+
+Decision
+
+Relvio will use a feature-first architecture with controlled data, domain, and presentation boundaries.
+
+Reason
+
+Relvio contains distinct product modules including:
+
+Authentication
+Organizations
+People
+Journey
+Communities
+Events
+Attendance
+Follow-Ups
+Communication
+Notifications
+Reports
+Workspace
+
+Feature-first organization improves discoverability and supports incremental implementation.
+
+Architectural layers must only be introduced when they have a clear responsibility.
+
+Empty folders and unnecessary architecture ceremony are discouraged.
+
+Alternatives Considered
+
+Global screens/models/services folders
+Strict layer-first project structure
+Unstructured feature development
+
+Related Decisions
+
+Decision 005
+Decision 015
+
+Status
+
+Approved
+
+Decision 017
+
+Date
+
+2026-07-11
+
+Category
+
+Security
+
+Decision
+
+Organization isolation is a critical security boundary and must be enforced by the backend.
+
+Reason
+
+Relvio serves multiple organizations from one platform.
+
+Frontend filtering cannot guarantee data isolation.
+
+Every organization-scoped backend operation must verify:
+
+Authentication
+Organization membership
+Organization-specific role
+Required permission
+Organization-scoped resource ownership
+
+A cross-organization data leak is classified as a Critical P0 defect.
+
+Alternatives Considered
+
+Client-side organization filtering
+Trusting client-provided organization IDs
+Separate application deployment per organization
+
+Related Decisions
+
+Decision 001
+Decision 003
+Decision 013
+
+Status
+
+Approved
+
+Decision 018
+
+Date
+
+2026-07-11
+
+Category
+
+Engineering
+
+Decision
+
+Attendance write operations will use backend integrity controls and idempotency.
+
+Reason
+
+Attendance may be recorded through:
+
+Search check-in
+Manual check-in
+QR check-in
+Walk-in registration
+Manual attendance
+Offline synchronization
+
+Mobile network retries and offline synchronization may repeat requests.
+
+Relvio must prevent duplicate attendance records.
+
+Protection should include:
+
+Backend validation
+Database constraints
+Idempotency keys for required operations
+
+Alternatives Considered
+
+Flutter-only duplicate prevention
+Retry without idempotency
+Manual duplicate cleanup
+
+Related Decisions
+
+Decision 006
+Decision 013
+Decision 017
+
+Status
+
+Approved
+
+Decision 019
+
+Date
+
+2026-07-11
+
+Category
+
+Engineering
+
+Decision
+
+Claude or another AI coding assistant may be used as an implementation engineer, but approved project documentation defines the architecture.
+
+Reason
+
+AI-assisted development can accelerate implementation, refactoring, and repetitive engineering work.
+
+However, allowing an AI coding assistant to independently redefine architecture across tasks may create inconsistent patterns.
+
+The implementation assistant must inspect relevant approved documentation before coding.
+
+The assistant must not silently:
+
+Change architecture
+Invent API endpoints
+Modify database design
+Invent design tokens
+Add unrelated features
+Replace approved dependencies
+
+Architectural decisions remain governed by approved project documentation and the Decision Log.
+
+Alternatives Considered
+
+Allow the coding assistant to design architecture per feature
+Develop without architectural documentation
+Avoid AI-assisted development
+
+Related Decisions
+
+Decision 015
+Decision 016
+
+Status
+
+Approved
+
+Decision 020
+
+Date
+
+2026-07-11
+
+Category
+
+Product
+
+Decision
+
+The final primary navigation item will use the label Workspace instead of More.
+
+Reason
+
+Workspace better communicates the operational and administrative area of Relvio.
+
+The section contains organization, profile, roles, permissions, settings, and related workspace controls.
+
+The label better supports Relvio's positioning as a People Operating System.
+
+Alternatives Considered
+
+More
+Admin
+Menu
+
+Related Decisions
+
+Decision 010
+Decision 012
+
+Status
+
+Approved
+
+Decision 021
+
+Date
+
+2026-07-11
+
+Category
+
+Engineering
+
+Decision
+
+Loading states, skeletons, shimmer, error states, empty states, and micro-interactions will be implemented during Flutter development.
+
+Reason
+
+These behaviours are application states and interaction details that are best implemented with the real Flutter state and component system.
+
+They do not require separate high-fidelity UI screens for every variation before implementation.
+
+All states must remain visually consistent with the approved Relvio design system.
+
+Alternatives Considered
+
+Design every state as a separate high-fidelity screen
+Ignore technical states until after MVP
+
+Related Decisions
+
+Decision 012
+
+Status
+
+Approved
+
+Decision 022
+
+Date
+
+2026-07-11
+
+Category
+
+Testing
+
+Decision
+
+Relvio testing will prioritize critical behaviour and data integrity instead of targeting an arbitrary code coverage percentage.
+
+Reason
+
+The most important product risks include:
+
+Organization isolation
+Permission enforcement
+Attendance duplication
+Journey history corruption
+Authentication and session failures
+Offline attendance synchronization
+
+A high coverage percentage does not guarantee these workflows are protected.
+
+Testing must focus on meaningful product behaviour.
+
+Alternatives Considered
+
+Mandatory universal coverage percentage
+Manual testing only
+
+Related Decisions
+
+Decision 014
+Decision 017
+Decision 018
+
+Status
+
+Approved
+
+Decision 023
+
+Date
+
+2026-07-11
+
+Category
+
+Product
+
+Decision
+
+Relvio will build and validate the approved core product before implementing automation, advanced integrations, or enterprise features.
+
+Reason
+
+The product must first prove that organizations repeatedly use the core system for:
+
+People
+Journey
+Follow-Ups
+Events
+Attendance
+Communication
+Reports
+
+Future roadmap ideas must not distract from completing and validating Relvio v1.
+
+Alternatives Considered
+
+Build automation before beta
+Build broad integrations before beta
+Build enterprise functionality before product validation
+
+Related Decisions
+
+Decision 009
+
+Status
+
+Approved
+
+Updating Decisions
+
+If an approved decision changes:
+
+Do not delete the original decision.
+Create a new decision.
+Reference the previous decision.
+Explain why the direction changed.
+Mark the previous decision as Replaced.
+
+Example:
+
+Decision 015
+Status: Replaced
+
+Replaced by:
+Decision 030
+
+This preserves project history.
+
+What Belongs in the Decision Log
+
+Record decisions that significantly affect:
+
+Product direction
+Product scope
+Architecture
+Database design
+API strategy
+Security
+Major dependencies
+Platform support
+Business model
+Core design direction
+
+Do not create a decision entry for every small implementation choice.
+
+Examples that normally do not require a Decision Log entry:
+
+Rename a private variable
+Split a widget
+Fix a padding issue
+Add a unit test
+Refactor a local function
+
+Use engineering judgment.
+
+AI Coding Assistant Rule
+
+AI coding assistants must treat Approved decisions as active project constraints.
+
+An AI coding assistant must not replace an Approved decision because it prefers another technology or pattern.
+
+If implementation conflicts with an Approved decision:
+
+Stop the conflicting implementation.
+Identify the conflict.
+Explain the impact.
+Request or document an architectural decision.
+Update the Decision Log if the approved direction changes.
+
+The Decision Log is part of Relvio's architectural memory.

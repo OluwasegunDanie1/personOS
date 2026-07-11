@@ -1,8 +1,8 @@
 ---
 Document: Logo Strategy
-Version: 1.0
-Status: Draft
-Project: Atlas (Codename)
+Version: 1.1
+Status: Approved
+Project: Relvio
 Owner: Product Team
 ---
 
@@ -10,55 +10,148 @@ Owner: Product Team
 
 ## Purpose
 
-This document defines the creative direction for the Atlas logo and visual identity.
+This document defines the approved Relvio logo system, its meaning, variations, usage principles, and implementation guardrails.
 
-The logo should be timeless, memorable, scalable, and immediately recognizable across every platform.
+The Relvio logo has already been designed and approved.
+
+This document is not a logo exploration brief.
+
+The approved logo must not be redesigned, structurally modified, or replaced during product implementation without a new approved brand decision.
 
 ---
 
 # Logo Philosophy
 
-Atlas is more than an attendance application.
+Relvio is a People Operating System built around relationships, journeys, and organizational connection.
 
-It is a platform that helps organizations build stronger relationships.
+The logo represents a connected system centered around Relvio.
 
-The logo should represent:
+The identity should communicate:
 
 - Connection
-- Growth
+- Relationships
+- Movement
+- Journey
 - Organization
 - Trust
 - Direction
-- Community
 
-Not religion.
+The logo is intentionally industry-neutral.
 
-Not business.
+It does not represent a specific religion, business category, school, NGO, or community type.
 
-Not technology.
+The logo represents the connected relationships between people and organizations.
 
-People.
+---
+
+# Approved Logo Concept
+
+The approved Relvio logo consists of a distinctive **R symbol surrounded by an orbital connection system**.
+
+The logo contains:
+
+- A central Relvio R
+- A circular orbital structure
+- Connected relationship nodes
+- Intentional breaks within the orbital line
+
+Together, these elements create the primary Relvio brand symbol.
+
+---
+
+# Symbol Meaning
+
+## The Relvio R
+
+The central R represents Relvio.
+
+It acts as the visual anchor of the identity.
+
+The R is custom and should not be replaced with a standard typed letter.
+
+---
+
+## The Orbit
+
+The circular orbital structure represents the organizational system around people.
+
+It communicates:
+
+- Movement
+- Continuity
+- Journey
+- Context
+- Connected activity
+
+The orbit should not be interpreted as a decorative circle.
+
+It is part of the meaning of the Relvio identity.
+
+---
+
+## Relationship Nodes
+
+The circular nodes represent meaningful points of connection.
+
+They may conceptually represent:
+
+- People
+- Events
+- Attendance
+- Follow-ups
+- Communication
+- Communities
+- Journey stages
+
+The nodes reinforce the idea that Relvio connects organizational activity around people.
+
+---
+
+## Orbital Breaks
+
+The intentional breaks within the orbit create movement and prevent the symbol from feeling static or closed.
+
+They communicate:
+
+- Progress
+- Ongoing journeys
+- Change
+- Direction
+
+The breaks are part of the approved symbol structure.
+
+They must not be automatically closed during logo recreation or vector tracing.
 
 ---
 
 # Brand Personality
 
-The logo should communicate:
+The Relvio logo should communicate:
 
 - Modern
 - Premium
-- Friendly
+- Calm
 - Intelligent
 - Reliable
 - Confident
+- Human
+- Connected
 
-Avoid looking playful or childish.
+The logo should not feel:
+
+- Childish
+- Playful
+- Aggressive
+- Corporate-heavy
+- Religious
+- Industry-specific
+- Overly technical
 
 ---
 
 # Design Principles
 
-The logo should be:
+The approved logo follows these principles:
 
 - Simple
 - Minimal
@@ -66,309 +159,469 @@ The logo should be:
 - Balanced
 - Scalable
 - Geometric
+- Recognizable
 
-A person should recognize it in less than two seconds.
+The symbol should remain recognizable without the Relvio wordmark.
 
 ---
 
-# Logo Requirements
+# Approved Logo Structure
 
-The logo must work on:
+The Relvio logo system consists of:
 
-- Mobile Apps
-- Desktop Apps
-- Websites
-- Social Media
+1. Primary Logo
+2. Horizontal Logo
+3. Stacked Logo
+4. Brand Symbol
+5. App Icon
+6. Monochrome Logo
+
+Each variation has a specific purpose.
+
+---
+
+# Primary Logo
+
+The primary Relvio logo consists of:
+
+**Brand Symbol + Relvio Wordmark**
+
+This is the preferred logo for general brand communication.
+
+Use it for:
+
+- Marketing materials
+- Product documentation
+- Presentations
+- Public brand materials
+- Future website
+- Partner materials
+
+The symbol and wordmark must preserve their approved proportions.
+
+---
+
+# Horizontal Logo
+
+The horizontal logo places the Relvio symbol beside the Relvio wordmark.
+
+This variation is preferred when horizontal space is available.
+
+Use it for:
+
+- Headers
 - Documentation
-- Presentation Slides
-- Business Cards
-- Favicons
+- Marketing materials
+- Presentation covers
+- Future website navigation
+
+Do not independently resize the symbol or wordmark.
 
 ---
 
-# Logo Structure
+# Stacked Logo
 
-The complete logo consists of:
+The stacked logo places the Relvio symbol above the wordmark.
 
-1. Logo Symbol
-2. Wordmark
-3. App Icon
+This variation may be used when vertical composition is more appropriate.
 
-Each should also work independently.
+The approved Relvio splash identity uses a vertically centered symbol and wordmark composition.
 
----
+Use it for:
 
-# Symbol Direction
-
-The symbol should communicate movement and connection.
-
-Possible inspirations include:
-
-- Intersecting paths
-- Connected nodes
-- Compass
-- Network
-- Journey
-- Abstract "A"
-- Bridge
-- Growth
-- Orbit
-- Community
-
-The symbol should avoid obvious clichés.
+- Splash experiences
+- Brand presentations
+- Square compositions
+- Selected promotional assets
 
 ---
 
-# Wordmark
+# Brand Symbol
 
-The wordmark should use:
+The brand symbol is the orbital R without the Relvio wordmark.
 
-Inter
+The symbol may be used independently when the Relvio brand is already clear.
 
-or
+Examples include:
 
-Manrope
+- Application interface
+- Onboarding
+- Authentication screens
+- Loading states
+- Brand illustrations
+- Compact product surfaces
 
-The typography should feel modern and clean.
-
-Avoid decorative fonts.
-
----
-
-# Logo Style
-
-Preferred style:
-
-Minimal geometric design.
-
-No gradients.
-
-No shadows.
-
-No unnecessary details.
-
-Flat design only.
+The symbol must not be replaced with a typed R.
 
 ---
 
 # App Icon
 
-The icon should be recognizable without text.
+The Relvio brand symbol is the approved basis for the application icon.
 
-Requirements:
+The app icon must preserve:
 
-- Works at 32px
-- Works at 64px
-- Works at 128px
-- Works on Android
-- Works on iOS
-- Works in browser tabs
+- The custom R
+- The orbital structure
+- Relationship nodes
+- Orbital breaks
+- Approved proportions
 
----
+Platform-specific icon packaging may be applied for Android and iOS.
 
-# Color Strategy
-
-Primary
-
-Blue
-
-Represents:
-
-- Trust
-- Stability
-- Intelligence
-
-Secondary
-
-Emerald
-
-Represents:
-
-- Growth
-- Success
-
-Accent
-
-Amber
-
-Used sparingly for highlights.
+The internal logo geometry must remain unchanged.
 
 ---
 
-# Light Version
+# Wordmark
 
-Dark symbol
+The Relvio wordmark is part of the approved logo identity.
 
-White background
+It must use the approved wordmark artwork.
 
----
+Do not recreate the wordmark by typing:
 
-# Dark Version
+```text
+Relvio
 
-White symbol
 
-Dark background
+with Inter or another font and treating it as the official logo.
 
----
+Inter is the approved product interface typeface.
 
-# Monochrome Version
+The logo wordmark is a brand asset.
 
-The logo should remain recognizable using only:
+Primary Logo Color
 
-- Black
-- White
+The primary Relvio logo color is:
 
----
+Relvio Blue
+#2563FF
 
-# Safe Area
+This is the preferred brand expression.
 
-Maintain clear spacing around the logo.
+Relvio Blue represents:
 
-Minimum spacing:
+Trust
+Clarity
+Intelligence
+Direction
+Confidence
+Approved Color Variations
+Relvio Blue
 
-Equal to the height of the "A" in Atlas.
+Blue symbol and blue wordmark.
 
-No elements should enter this space.
+Preferred for primary brand use on light backgrounds.
 
----
+Black
 
-# Minimum Size
+Black symbol and black wordmark.
 
-Print
+Used for monochrome applications and selected neutral brand contexts.
 
-20mm
+White
 
-Digital
+White symbol and white wordmark.
 
-24px
+Used on dark backgrounds.
 
-The logo should remain readable below these sizes.
+The background must provide sufficient contrast.
 
----
+Gradient Rule
 
-# Logo Variations
+The core Relvio logo must not use decorative gradients.
 
-Atlas should have:
+If a generated visual asset contains gradient-like lighting or glow, that effect must not be treated as part of the official logo geometry.
 
-Primary Logo
+The official logo asset should remain flat and reproducible.
 
-Logo Symbol + Wordmark
+Shadow Rule
 
----
+Do not apply permanent shadows to the official logo.
 
-Horizontal Logo
+Soft visual glow may appear in product compositions such as splash or onboarding screens when approved by the design language.
 
-Symbol beside wordmark
+The glow belongs to the screen composition.
 
----
+It is not part of the logo.
 
-Stacked Logo
+Clear Space
 
-Symbol above wordmark
+Maintain clear space around the Relvio logo.
 
----
+For the primary and horizontal logo, the minimum clear space should be based on the diameter of one visible relationship node in the approved symbol.
 
-App Icon
+At least 4 node diameters of clear space should be preserved around the complete logo whenever practical.
 
-Symbol only
+No text, icon, border, or unrelated visual element should enter this area.
 
----
+For compact application surfaces, visual judgment may be used while preserving logo clarity.
 
-Favicon
+Minimum Size
 
-Simplified symbol
+The Relvio symbol must remain visually recognizable.
 
----
+Recommended digital minimum:
 
-# What To Avoid
+24 logical pixels
 
-Do not use:
+For important brand surfaces, prefer:
 
-- Religious symbols
-- Hands
-- People silhouettes
-- Buildings
-- Church icons
-- Globes
-- Excessive gradients
-- 3D effects
-- Clipart
+32 logical pixels or larger
 
-The logo should remain industry-neutral.
+At very small sizes, verify that:
 
----
+The R remains recognizable
+The orbital structure remains visible
+The relationship nodes do not visually merge
 
-# Emotional Goal
+Do not manually remove logo elements to make the symbol fit.
 
-When someone sees the Atlas logo they should think:
+A separately approved simplified micro-mark would require a new brand decision.
 
-"This looks professional."
+Logo Scaling
 
-"This feels trustworthy."
+Always scale the logo proportionally.
 
-"This looks like software I'd pay for."
+Do not:
 
----
+Stretch horizontally
+Stretch vertically
+Compress the symbol
+Change the orbit proportions
+Resize individual nodes
+Change the R-to-orbit relationship
 
-# Inspiration
+Use approved vector assets whenever available.
 
-The logo should feel at home beside brands like:
+Logo Rotation
 
-- Linear
-- Notion
-- Stripe
-- Slack
-- Figma
-- Vercel
-- ClickUp
-- Airtable
+Do not rotate the Relvio logo.
 
-Not because it copies them,
+The approved orientation is part of the brand identity.
 
-but because it shares the same design quality.
+The orbit may be animated in product experiences, but the base logo asset must preserve its approved orientation.
 
----
+Logo Animation
 
-# Logo Evaluation Checklist
+The Relvio symbol may support subtle product animation.
 
-Before approving the logo, ask:
+Possible approved motion concepts include:
 
-- Is it memorable?
-- Does it work in black and white?
-- Does it scale well?
-- Can it be recognized without text?
-- Does it represent Atlas?
-- Will it still look modern in ten years?
+Relationship nodes appearing sequentially
+A soft orbital line reveal
+Subtle node movement
+Gentle logo fade and scale
+Controlled orbital progress motion
 
-If any answer is "No", redesign it.
+Animations should feel:
 
----
+Calm
+Smooth
+Premium
+Intentional
 
-# Future Assets
+Avoid:
 
-The logo system will later include:
+Fast spinning
+Bouncing
+Elastic distortion
+Aggressive glow
+Continuous distracting motion
 
-- Brand Icon
-- App Icon
-- Social Media Avatar
-- Favicon
-- Loading Animation
-- Splash Screen
-- Brand Pattern
-- Brand Illustrations
+Logo animation is an interaction treatment.
 
----
+It must not permanently alter the logo geometry.
 
-# Success Criteria
+Light Background Usage
 
-The Atlas logo is successful when:
+On light backgrounds, prefer:
 
-- It is instantly recognizable.
-- It works across every platform.
-- It reflects trust and connection.
-- It remains timeless.
-- It supports future brand growth.
+Relvio Blue logo
+Black monochrome logo
 
----
+The background should remain visually clean.
 
-# End of Document
+Approved primary application background:
+
+#FCFCFD
+Dark Background Usage
+
+On dark backgrounds, use the white logo.
+
+Ensure strong visual contrast.
+
+Do not use Relvio Blue when the surrounding background reduces logo visibility.
+
+Monochrome Usage
+
+The Relvio logo must remain recognizable in:
+
+Black
+White
+
+Monochrome versions may be used for:
+
+Legal documents
+Printed materials
+Internal documentation
+Single-color production
+Accessibility or technical constraints
+Product Usage
+
+Within the Relvio application, the brand symbol may appear on:
+
+Splash screen
+Welcome screen
+Onboarding
+Authentication
+Organization setup
+Empty-state illustrations
+Selected loading experiences
+
+The logo should not be repeated unnecessarily on every application screen.
+
+Once the user enters the primary application workspace, product content should become the visual focus.
+
+Splash Screen Usage
+
+The approved Relvio splash composition contains:
+
+Relvio brand symbol
+Relvio wordmark
+Centered composition
+Generous whitespace
+Light background
+
+The splash experience may include subtle motion during Flutter implementation.
+
+The approved logo structure must remain unchanged.
+
+Onboarding Usage
+
+Relvio onboarding may use the brand symbol as part of connected orbital illustrations.
+
+The logo can visually interact with:
+
+Nodes
+Product icons
+Relationship paths
+Circular systems
+
+Illustrations must remain consistent with the approved Relvio visual language.
+
+Do not distort the logo to create illustrations.
+
+What To Avoid
+
+Do not:
+
+Redraw the R
+Replace the R with a typed letter
+Close the orbital breaks
+Remove relationship nodes
+Add additional random nodes
+Change node positions without an approved logo revision
+Stretch the logo
+Rotate the base logo
+Apply decorative gradients
+Add permanent shadows
+Add 3D effects
+Add religious symbols
+Add people silhouettes
+Add buildings
+Add church icons
+Add globes
+Place the logo inside unrelated shapes
+Change the approved brand color
+Recreate the wordmark using an arbitrary font
+Industry Neutrality
+
+The Relvio logo must remain organization-neutral.
+
+The logo should work for:
+
+Churches
+Ministries
+NGOs
+Communities
+Associations
+Schools
+Clubs
+People-centered businesses
+
+Industry-specific visual symbols must not be added to the core Relvio logo.
+
+Emotional Goal
+
+When someone sees the Relvio logo, the desired response is:
+
+"This feels modern."
+
+"This feels connected."
+
+"This looks trustworthy."
+
+"This feels like thoughtful software."
+
+The logo should support the premium and calm character of the Relvio product.
+
+Logo Asset Source of Truth
+
+Approved logo files should be stored inside the project's documented brand asset structure.
+
+Implementation must use approved assets.
+
+Developers and AI coding assistants must not regenerate the Relvio logo from screenshots or attempt to recreate it using Flutter drawing code unless explicitly approved.
+
+If an approved vector asset is available, use the vector asset.
+
+Logo asset naming and storage rules are defined in:
+
+Asset_Structure.md
+
+and:
+
+Brand Assets.md
+Logo Evaluation Checklist
+
+Before using the logo in a new context, verify:
+
+Is the approved asset being used?
+Are the proportions unchanged?
+Is the logo clearly visible?
+Is sufficient clear space preserved?
+Is the correct color variation used?
+Is the background appropriate?
+Is the logo free from unnecessary effects?
+Does the usage feel consistent with Relvio?
+
+If any answer is no, correct the usage before release.
+
+AI Coding Assistant Guardrail
+
+AI coding assistants must not redesign, recreate, or reinterpret the Relvio logo.
+
+When implementing the application:
+
+Locate the approved logo asset.
+Use the documented asset path.
+Preserve the asset aspect ratio.
+Apply only approved sizing and composition rules.
+Do not approximate the logo with icons, text, or custom shapes.
+
+If the required logo asset is missing, stop and report the missing asset.
+
+Do not invent a replacement.
+
+Success Criteria
+
+The Relvio logo system is successful when:
+
+The symbol is immediately recognizable.
+The approved identity remains consistent across product surfaces.
+The logo works at mobile application scale.
+The identity communicates connection and movement.
+The logo remains industry-neutral.
+Developers can implement the logo without redesigning it.

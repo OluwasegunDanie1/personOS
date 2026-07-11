@@ -2,7 +2,7 @@
 Document: System Architecture
 Version: 0.1
 Status: Draft
-Project: Atlas (Codename)
+Project: Relvio
 Owner: Engineering Team
 ---
 
@@ -21,16 +21,22 @@ The goal is to build a scalable, secure, and maintainable platform that can supp
 Atlas follows a modern client-server architecture.
 
 ```
-Flutter App
+Flutter Mobile App
         │
         ▼
- REST API / Backend
+ REST API
         │
         ▼
- Business Logic
+ Application Layer
         │
         ▼
- Database
+ Domain Layer
+        │
+        ▼
+ Infrastructure Layer
+        │
+        ▼
+ PostgreSQL + Object Storage
 ```
 
 Every layer has a single responsibility.
@@ -55,7 +61,7 @@ Every layer has a single responsibility.
                   │
      ┌────────────┴────────────┐
      │                         │
- Web Dashboard          Mobile App
+ Future Web Dashboard          Mobile App
      │                         │
      └────────────┬────────────┘
                   │
@@ -81,14 +87,14 @@ Every layer has a single responsibility.
 - GoRouter
 - Dio
 - Freezed
-- Drift / Isar (Offline Support)
+- Isar (Offline Database)
+- SharedPreferences / Secure Storage
 
 ---
 
 ## Backend
 
-To be finalized.
-
+Backend architecture will follow REST principles and a layered architecture (Presentation, Application, Domain, Infrastructure). The implementation technology will be selected before backend development begins.
 Possible options:
 
 - Laravel
@@ -137,11 +143,15 @@ Support:
 
 # Multi-Tenant Architecture
 
+
 Atlas is a multi-tenant platform.
 
 One application.
 
 Many organizations.
+Every record must include an organization identifier (organization_id).
+
+All database queries must be scoped to the authenticated organization.
 
 ```
 Atlas
@@ -194,6 +204,11 @@ Each module should remain independent.
 /settings
 
 /users
+
+/api/v1/auth
+/api/v1/people
+/api/v1/events
+...
 ```
 
 Use consistent naming throughout.
@@ -207,6 +222,7 @@ Every request should verify:
 - Authentication
 - Organization
 - Permissions
+- Authorization must use Role-Based Access Control (RBAC).
 
 Users must never access another organization's data.
 
@@ -237,6 +253,8 @@ Examples:
 - Save notes
 
 Changes should sync automatically when the connection returns.
+
+Offline changes shall be stored locally and synchronized using a background sync queue when connectivity is restored.
 
 ---
 
@@ -279,6 +297,7 @@ Examples:
 - Attendance updates
 - Deleted records
 - Permission changes
+- Logs should include timestamps and user identifiers where applicable.
 
 ---
 
@@ -288,6 +307,8 @@ Examples:
 - Efficient API responses
 - Minimal loading screens
 - Lazy loading where appropriate
+- - Pagination for large datasets
+- Server-side filtering and search
 
 ---
 
@@ -301,6 +322,7 @@ The system should support:
 - Concurrent users
 
 without major architectural changes.
+The architecture should allow horizontal backend scaling without requiring client-side changes.
 
 ---
 

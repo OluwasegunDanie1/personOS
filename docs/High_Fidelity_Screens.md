@@ -1,8 +1,8 @@
 ---
 Document: High-Fidelity Screens
-Version: 1.0
-Status: Draft
-Project: Atlas (Codename)
+Version: 1.1
+Status: Approved
+Project: Relvio
 Owner: Design Team
 ---
 
@@ -10,530 +10,602 @@ Owner: Design Team
 
 ## Purpose
 
-This document defines every high-fidelity screen that will be designed before development begins.
+This document defines how approved Relvio high-fidelity screen designs are interpreted during implementation.
 
-Unlike wireframes, these screens include:
+The Relvio v1 mobile UI is already complete, approved, and frozen.
 
-- Final colors
-- Typography
-- Icons
-- Components
-- Spacing
-- Interactions
+This document does not define a new screen inventory.
 
-These screens become the visual blueprint for implementation.
+This document does not redesign approved screens.
 
----
+This document does not authorize implementation teams or AI coding assistants to invent missing screens, controls, fields, navigation destinations, or responsive platform layouts.
 
-# Design Principles
-
-Every screen should be:
-
-- Clean
-- Modern
-- Fast
-- Consistent
-- Accessible
-
-The user should immediately understand what to do.
+Approved high-fidelity UI references are the visual blueprint for Flutter implementation.
 
 ---
 
-# Authentication
+# Approved Product Platforms
 
-## Splash Screen
+Relvio v1 product platforms are:
 
-Contains
+- Android
+- iOS
 
-- Atlas Logo
-- App Name
-- Loading Indicator
+The approved v1 high-fidelity UI is mobile-focused.
 
----
+This document does not approve:
 
-## Welcome Screen
+- Web application UI
+- Desktop application UI
+- Tablet-specific product layouts
+- Desktop navigation systems
+- Desktop tables
+- Desktop dashboard layouts
+- Fixed desktop breakpoint designs
 
-Contains
+Flutter must not create web or desktop UI infrastructure from this document.
 
-- Brand Illustration
-- Welcome Message
-- Login Button
-- Create Organization Button
-
----
-
-## Login
-
-Contains
-
-- Logo
-- Email
-- Password
-- Remember Me
-- Forgot Password
-- Login Button
+Tablet behavior may use reasonable Flutter layout adaptation where required by the mobile application runtime, but tablet-specific product redesign is not approved unless separately documented.
 
 ---
 
-## Registration
+# High-Fidelity UI Authority
 
-Contains
+The approved frozen Relvio UI is the visual authority for v1 implementation.
 
-- Organization Name
-- Full Name
-- Email
-- Password
-- Confirm Password
-- Continue Button
+Approved screen references control visible decisions such as:
 
----
+- Screen composition
+- Visual hierarchy
+- Navigation presentation
+- Content placement
+- Component appearance
+- Typography usage
+- Color usage
+- Spacing relationships
+- Radius usage
+- Icon placement
+- Button presentation
+- Card presentation
+- Input presentation
+- Empty visual space
+- Approved visible states
 
-## Forgot Password
+Implementation must reproduce the approved design faithfully.
 
-Contains
+Textual documentation must not silently override an approved visual decision.
 
-- Email Input
-- Send Reset Link
+If a textual document and an approved high-fidelity screen appear to conflict, the conflict must be reported and resolved through documentation review.
 
----
-
-# Onboarding
-
-## Organization Setup
-
-Contains
-
-- Organization Name
-- Logo Upload
-- Organization Type
-- Country
-- Time Zone
+Claude or another AI coding assistant must not choose a new design direction.
 
 ---
 
-## Invite Team
+# Frozen UI Rule
 
-Contains
+The approved Relvio v1 mobile UI is frozen.
 
-- Email Input
-- Role Selector
-- Send Invite
+Do not:
 
----
+- Redesign approved screens
+- Rearrange approved screen hierarchy
+- Add visible product features because they appear common in similar applications
+- Replace approved components with generic Material defaults
+- Add unapproved tabs
+- Add unapproved navigation destinations
+- Add unapproved dashboard widgets
+- Add unapproved profile sections
+- Add unapproved settings sections
+- Add unapproved filters
+- Add unapproved fields
+- Add unapproved action buttons
+- Add desktop-style controls
+- Add speculative responsive layouts
 
-## Setup Complete
-
-Contains
-
-- Success Illustration
-- Continue to Dashboard Button
-
----
-
-# Dashboard
-
-Widgets
-
-- Welcome Banner
-- Statistics
-- Recent Activity
-- Upcoming Events
-- Pending Follow-ups
-- Quick Actions
-
-Responsive for:
-
-- Mobile
-- Tablet
-- Desktop
+A screen may only change when an approved product or design decision explicitly changes it.
 
 ---
 
-# People Module
+# Product Naming
 
-## People List
+The public product name is:
 
-Contains
+**Relvio**
 
-- Search
-- Filters
-- Tags
-- Table
-- Pagination
-- Add Person Button
+The internal early codename Atlas must not appear in production UI.
 
----
+Approved Relvio logo assets must be used directly.
 
-## Add Person
+Do not recreate the Relvio logo:
 
-Sections
+- From screenshots
+- With Flutter drawing code
+- With generic icons
+- With text approximations
+- With generated replacement artwork
 
-- Personal Information
-- Contact Information
-- Tags
-- Notes
+If an approved required logo asset is missing, report the missing asset.
+
+Do not invent a replacement.
 
 ---
 
-## Person Profile
+# Brand Alignment
 
-Sections
+Approved Relvio brand decisions remain authoritative.
 
-- Profile Header
-- Timeline
-- Attendance
-- Journey
-- Follow-ups
-- Notes
+Primary brand color:
 
----
+`#2563FF`
 
-# Journey Module
+Primary application background:
 
-## Journey Board
+`#FCFCFD`
 
-Kanban Layout
+Typeface:
 
-Stages
+`Inter`
 
-Visitor
+Primary brand message:
 
-↓
+> Build stronger relationships.
 
-First Visit
+High-fidelity implementation must remain consistent with approved brand documentation.
 
-↓
-
-Follow-up
-
-↓
-
-Member
-
-↓
-
-Volunteer
-
-↓
-
-Leader
-
-Supports drag and drop.
+This document does not redefine the brand identity.
 
 ---
 
-# Events
+# Navigation
 
-## Events List
+The approved frozen navigation design must be implemented as shown in the approved UI references.
 
-Contains
+The final approved primary bottom navigation label is:
 
-- Calendar
-- Filters
-- Search
-- Event Cards
+**Workspace**
 
----
+Do not use:
 
-## Event Details
+**More**
 
-Contains
+Workspace must replace obsolete More naming in:
 
-- Event Information
-- Attendance
-- Assigned Staff
-- Notes
+- Visible navigation labels
+- Screen names
+- Route naming
+- Folder naming
+- Provider naming
+- Test naming
 
----
-
-## Create Event
-
-Contains
-
-- Event Name
-- Date
-- Time
-- Location
-- Description
+Do not add navigation destinations that are not present in approved product and UI documentation.
 
 ---
 
-# Attendance
+# Screen Inventory
 
-## Attendance List
+The approved high-fidelity screen inventory is determined by the frozen Relvio v1 UI references and approved product documentation.
 
-Contains
+This document intentionally does not reproduce a speculative screen-by-screen feature list.
 
-- Search
-- Person List
-- Check-in Controls
+A textual screen inventory must not become a second visual specification.
 
----
+Implementation teams must use the approved UI references for the actual visible screen structure.
 
-## Attendance History
+If an implementation-required screen cannot be identified in the approved references or approved product documentation:
 
-Contains
-
-- Filters
-- Charts
-- Export
+1. Do not invent the screen.
+2. Do not copy a generic SaaS pattern.
+3. Do not derive the screen from the old Atlas drafts.
+4. Report the missing design or documentation decision.
+5. Wait for clarification or approval.
 
 ---
 
-# Follow-ups
+# Screen Implementation
 
-## Follow-up List
+Approved screens must be implemented as Flutter widgets.
 
-Contains
+UI screenshots are design references.
 
-- Pending
-- Completed
-- Overdue
+They are not production UI assets.
 
----
+Do not:
 
-## Create Follow-up
+- Place complete screenshots inside Flutter screens
+- Crop buttons from screenshots
+- Crop cards from screenshots
+- Crop text from screenshots
+- Crop standard icons from screenshots
+- Use screenshots to simulate interactive UI
 
-Contains
+Flutter must implement the visible interface using real widgets.
 
-- Person
-- Assigned User
-- Due Date
-- Notes
-
----
-
-# Reports
-
-Create designs for:
-
-Attendance Report
-
-Growth Report
-
-Journey Report
-
-People Report
-
-Custom Report
+Approved production image and brand assets must follow `Asset_Structure.md` and `Brand Assets.md`.
 
 ---
 
-# Notifications
+# Visual Fidelity
 
-Contains
+Implementation should preserve the approved visual relationships shown in the high-fidelity UI.
 
-- Notification List
-- Read Status
-- Filters
+Important areas include:
 
----
+- Content hierarchy
+- Alignment
+- Relative spacing
+- Component dimensions
+- Typography hierarchy
+- Icon sizing and placement
+- Border treatment
+- Radius treatment
+- Surface treatment
+- Background treatment
+- Visual emphasis
+- Navigation balance
 
-# Organization
+The goal is faithful implementation of the approved Relvio UI.
 
-Contains
-
-- Organization Profile
-- Branding
-- Team Members
-
----
-
-# User Management
-
-Contains
-
-- Users
-- Roles
-- Permissions
+The goal is not to reinterpret the UI using a generic Flutter or Material design style.
 
 ---
 
-# Settings
+# Design Tokens
 
-Sections
+Approved design tokens must be used where a verified centralized token exists.
 
-General
+`Design Tokens.md` controls approved token definitions.
 
-Appearance
+`Color System.md` controls approved color responsibilities.
 
-Security
+`Flutter Theme Implementation.md` controls Flutter theme implementation boundaries.
 
-Notifications
+`Component Library.md` controls approved shared component responsibilities.
 
-Organization
+Do not create generic token scales to fill perceived gaps.
 
-Account
+Do not invent:
+
+- Spacing scales
+- Radius scales
+- Shadow scales
+- Motion scales
+- Breakpoint scales
+
+Unique intentional approved values may remain local where appropriate.
+
+The goal is controlled consistency, not zero numeric literals.
 
 ---
 
-# Error Pages
+# Components
 
-Design
+Repeated approved visual responsibilities should use approved centralized components where appropriate.
 
-403
+A shared component should reflect a genuinely repeated Relvio UI responsibility.
 
-404
+Do not create generic component abstractions solely because multiple Flutter widgets look technically similar.
 
-500
+Do not force unique approved screens into shared components when doing so damages visual fidelity or creates unnecessary configuration complexity.
 
-Offline
+Material defaults must not silently redefine approved Relvio components.
+
+---
+
+# Screen States
+
+Relvio screens must handle real application states required by their implemented behavior.
+
+Relevant states may include:
+
+- Initial loading
+- Refreshing
+- Loaded content
+- Empty content
+- Recoverable error
+- Unavailable action
+- Submission in progress
+- Submission failure
+- Submission success
+
+The exact states for a screen depend on its approved behavior and data requirements.
+
+Do not create decorative state variants that have no product or technical purpose.
+
+Do not add visible state designs that conflict with the frozen UI.
+
+Where an implementation-required state is not visually specified, use the approved Relvio design system and existing approved visual language without redesigning the screen.
+
+If the missing state requires a significant product or visual decision, report it.
+
+---
+
+# Loading Behavior
+
+Loading behavior should match the real asynchronous responsibility of the screen.
+
+Appropriate techniques may include:
+
+- Progress indicators
+- Skeleton content
+- Shimmer
+- Local button loading states
+- Inline loading states
+- Refresh indicators
+
+No single loading technique is mandatory for every screen.
+
+Skeletons and shimmer must not be added mechanically.
+
+Loading UI should:
+
+- Preserve layout stability where practical
+- Avoid misleading fake content
+- Communicate active work
+- Avoid duplicate submissions
+- Remain visually consistent with Relvio
+
+Implementation details may be completed during Flutter coding where appropriate.
 
 ---
 
 # Empty States
 
-Every module should have:
+Empty states should communicate the actual absence of relevant content.
 
-Illustration
+Where appropriate, an empty state may include:
 
-Headline
+- Clear empty-state messaging
+- Supporting context
+- An approved relevant action
 
-Description
+Illustrations are not mandatory.
 
-Primary Action
+Do not invent illustration assets.
 
----
+Do not add actions that are not approved product actions.
 
-# Loading States
-
-Create skeleton screens for:
-
-Dashboard
-
-People
-
-Events
-
-Reports
-
-Profile
+Empty states must remain consistent with the frozen Relvio UI and approved product behavior.
 
 ---
 
-# Dialogs
+# Error States
 
-Design:
+Errors should be handled according to actual application and API behavior.
 
-Delete Confirmation
+Potential categories include:
 
-Archive
+- Recoverable loading failure
+- Validation failure
+- Authentication failure
+- Authorization failure
+- Network unavailability
+- Resource unavailability
+- Server failure
 
-Logout
+This document does not require dedicated visual pages for every HTTP status code.
 
-Success
+Backend HTTP behavior is controlled by approved API and security documentation.
 
-Warning
+Flutter should present user-appropriate feedback without exposing internal implementation details.
 
-Error
-
----
-
-# Mobile Screens
-
-Every major screen should have a mobile version.
-
-No screen should simply shrink from desktop.
-
-Layouts should adapt naturally.
+Do not invent new product navigation to handle technical errors.
 
 ---
 
-# Tablet Screens
+# Interaction States
 
-Optimize:
+Flutter implementation must support interaction states that are relevant to mobile use.
 
-- Navigation
-- Tables
-- Cards
-- Dashboard
-
----
-
-# Desktop Screens
-
-Support:
-
-1280px
-
-1440px
-
-1920px
-
----
-
-# Responsive Rules
-
-Every screen must adapt while maintaining:
-
-- Navigation
-- Hierarchy
-- Readability
-- Accessibility
-
----
-
-# Interactive States
-
-Design every component for:
+These may include:
 
 - Default
-- Hover
-- Focus
-- Active
+- Pressed
+- Focused
 - Disabled
 - Loading
-- Error
-- Empty
+- Validation error
+
+Desktop hover behavior is not a v1 mobile design requirement.
+
+Interaction states should use approved Relvio visual responsibilities.
+
+Do not introduce a generic interaction-state system that changes the frozen visual language.
 
 ---
 
-# Prototype
+# Motion and Micro-Interactions
 
-Build clickable prototypes for:
+Animations, transitions, shimmer, skeletons, loading states, and micro-interactions may be implemented during Flutter coding where appropriate.
 
-- Login
-- Organization Setup
-- Dashboard
-- Add Person
-- Create Event
-- Record Attendance
-- Follow-up Workflow
+Simple animations should be implemented directly in Flutter where practical.
+
+Do not add Lottie or Rive by default.
+
+Motion should:
+
+- Support understanding
+- Reinforce state changes
+- Feel responsive
+- Remain subtle
+- Avoid delaying primary actions
+- Avoid unnecessary visual noise
+
+This document does not approve new animated product experiences.
+
+---
+
+# Accessibility
+
+Approved high-fidelity screens must be implemented with practical mobile accessibility considerations.
+
+Implementation should consider:
+
+- Semantic meaning
+- Readable text
+- Appropriate touch targets
+- Screen reader support
+- Logical focus behavior
+- Form labels
+- Error communication
+- Sufficient visual distinction for important states
+
+Accessibility implementation must preserve the approved Relvio product hierarchy and visual identity where possible.
+
+If an approved visual decision creates a serious accessibility conflict, report the conflict for review rather than silently redesigning the screen.
+
+---
+
+# Theme Boundary
+
+Relvio v1 uses the approved light theme.
+
+Dark mode is not approved for v1.
+
+System theme switching is not approved.
+
+Do not add:
+
+- A theme toggle
+- An Appearance settings section for theme switching
+- Riverpod theme state
+- Dark theme infrastructure
+- Organization-controlled application themes
+- White-label theme infrastructure
+
+`Flutter Theme Implementation.md` remains authoritative for Flutter theme rules.
+
+---
+
+# Responsive Boundary
+
+Relvio v1 is a mobile application for Android and iOS.
+
+Implementation must handle supported mobile screen sizes without breaking the approved UI.
+
+Layouts should avoid:
+
+- Unintentional overflow
+- Clipped essential content
+- Unreachable controls
+- Broken text layout
+- Unsafe system-area placement
+
+Responsive implementation should preserve the approved mobile design rather than create new desktop or tablet product layouts.
+
+Do not derive desktop breakpoints or desktop screens from the mobile UI.
+
+---
+
+# Prototype Status
+
+The approved high-fidelity UI and approved design references represent the design direction for v1 implementation.
+
+This document does not require a new prototype phase before Flutter coding.
+
+Do not recreate approved flows merely to satisfy an outdated Atlas prototype checklist.
+
+If interaction behavior is unclear during implementation, compare:
+
+1. Approved UI references
+2. Approved product documentation
+3. Approved API documentation
+4. Approved architecture documentation
+
+If the behavior remains undefined, report the missing decision.
+
+Do not invent the interaction.
+
+---
+
+# AI Implementation Rules
+
+Claude or another AI coding assistant acts as an implementation engineer.
+
+When implementing approved high-fidelity screens, AI must not invent:
+
+- Screens
+- Product features
+- Navigation destinations
+- Fields
+- Filters
+- Dashboard widgets
+- Journey stages
 - Reports
+- Settings sections
+- Organization branding controls
+- Theme controls
+- Desktop layouts
+- Tablet product layouts
+- API endpoints
+- API fields
+- Database structures
+
+AI should implement the approved Relvio UI using approved documentation as architectural and product guidance.
+
+When information is missing or contradictory, AI must report the issue.
+
+It must not resolve product ambiguity by inventing a common SaaS pattern.
 
 ---
 
-# Design Approval Checklist
+# Documentation Responsibilities
 
-Before a screen is approved:
+This document owns:
 
-- Uses Design Tokens
-- Uses Components
-- Responsive
-- Accessible
-- Consistent
-- Matches Brand Identity
-- Ready for Development
+- High-fidelity UI implementation authority
+- Frozen screen governance
+- Visual reference interpretation
+- Screen implementation boundaries
+- Missing-design handling rules
+
+This document does not own:
+
+- Product feature scope
+- API contracts
+- Database structures
+- Security rules
+- Architecture
+- Design token definitions
+- Color definitions
+- Shared component specifications
+- Flutter theme architecture
+- Asset organization
+
+Those responsibilities remain with their approved Relvio documents.
 
 ---
 
-# Deliverables
+# Implementation Readiness
 
-The design phase is complete when:
+The high-fidelity UI is considered ready for implementation because the Relvio v1 mobile design has been approved and frozen.
 
-- All high-fidelity screens are finished.
-- Mobile, tablet, and desktop versions exist.
-- Interactive prototype is complete.
-- Design system is fully utilized.
-- Developer handoff is ready.
+Flutter implementation may rely on the approved UI references when:
+
+- The screen is part of approved product scope
+- The required visual reference exists
+- Required approved assets exist
+- Required product behavior is documented
+- Required API behavior is documented where applicable
+
+If one of these requirements is missing, the implementation gap must be reported.
+
+Do not redesign or invent the missing responsibility.
 
 ---
 
 # Success Criteria
 
-A high-fidelity design is successful when developers can implement it without asking for visual clarification.
+High-fidelity screen implementation is successful when:
 
-Every spacing, color, component, and interaction should already be defined.
+- Approved Relvio screens are reproduced faithfully
+- The frozen UI is not redesigned
+- Flutter uses real widgets rather than screenshot fragments
+- Approved assets are used directly
+- Product behavior is not invented from visual assumptions
+- Mobile layouts remain stable across supported Android and iOS screen sizes
+- Loading, empty, error, and interaction states support real application behavior
+- AI coding assistants can distinguish visual authority from product and architecture authority
+- Missing design decisions are reported instead of invented
 
 ---
 
