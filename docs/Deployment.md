@@ -389,6 +389,34 @@ Do not create integrations because they appear in this document.
 
 Actual configuration names must come from the approved backend implementation.
 
+Authentication Secret Configuration
+
+JWT_ACCESS_SECRET is a required backend secret used to sign access tokens.
+
+JWT_ACCESS_SECRET must:
+
+Never be committed to source control.
+Never be exposed to the Flutter application.
+Have no hardcoded fallback value.
+
+Backend authentication configuration must fail clearly when JWT_ACCESS_SECRET is absent.
+
+For the minimal login, refresh, and logout implementation phase, JWT_ACCESS_SECRET is the only newly required authentication secret. Refresh, email-verification, and password-reset tokens are opaque random values that are hashed for storage and do not require a separate signing secret.
+
+Authentication Public-Exposure Readiness
+
+The following remain intentionally unresolved and must be decided before authentication endpoints are exposed to public production traffic:
+
+Exact login rate-limit threshold/window
+Exact refresh rate-limit threshold/window
+Exact forgot-password rate-limit threshold/window
+Trust-proxy configuration
+CORS configuration
+Email verification delivery provider/mechanism
+Password-reset delivery provider/mechanism
+
+Do not implement email verification or password-reset delivery until delivery infrastructure is approved.
+
 Database Deployment
 
 PostgreSQL is the approved primary relational database.

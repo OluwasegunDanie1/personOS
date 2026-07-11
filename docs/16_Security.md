@@ -114,9 +114,11 @@ Passwords must never be stored in plain text.
 
 Passwords must be hashed using a modern password hashing algorithm.
 
-The approved v1 algorithm is Argon2id, using the secure defaults of the approved Argon2 implementation.
+The approved v1 algorithm is Argon2id, implemented using the argon2 Node package, using the secure defaults of the approved Argon2 implementation.
 
 Hash configuration must be centralized. Algorithm parameters must not be scattered through authentication code.
+
+SHA-256 must never be used for password storage.
 
 Password hashes must never be returned by the API.
 
@@ -171,11 +173,23 @@ The backend must determine whether an email is verified.
 
 The Flutter client must not be allowed to mark an account as verified.
 
+Opaque Authentication Token Generation and Hashing
+
+Refresh tokens, email verification tokens, and password reset tokens are generated using Node's built-in crypto.randomBytes(32), encoded as base64url. Do not use UUIDs or Math.random for authentication token generation.
+
+The raw token value is hashed using SHA-256 (Node built-in crypto) before storage. The stored representation is lowercase hexadecimal. Only the hash is stored; the raw token is never stored.
+
+SHA-256 token hashing is approved only for these high-entropy opaque authentication tokens. It must never be used for password storage.
+
 Session Security
 
 Authentication state must have a single authoritative backend source.
 
 Access tokens are signed JWTs with a 15-minute lifetime. Access JWTs must never be persisted in PostgreSQL.
+
+Access tokens use symmetric HS256 signing via the approved @nestjs/jwt integration. The signing secret is provided through the JWT_ACCESS_SECRET environment variable, which must never be committed to source control, must never be exposed to the Flutter application, and must have no hardcoded fallback value. Backend authentication configuration must fail clearly when JWT_ACCESS_SECRET is absent.
+
+Access-token claims are limited to: sub (global User ID), iat, exp, iss (relvio-api), aud (relvio-mobile). The login access token must not contain organization ID, active organization, role, or permission claims. Organization context selection is a separate explicit membership/context workflow.
 
 Refresh tokens are used for session renewal (see Refresh Token Security).
 
@@ -436,6 +450,18 @@ the backend must reject unsupported values.
 Frontend validation improves usability.
 
 Backend validation protects the system.
+
+DTO Validation
+
+Request DTO validation uses class-validator and class-transformer.
+
+A single global NestJS ValidationPipe must be registered with:
+
+whitelist: true
+forbidNonWhitelisted: true
+transform: true
+
+Validation failures surface as standard NestJS HttpException responses. The backend's global exception filter normalizes these into the approved public API error envelope without requiring structural changes.
 
 API Security
 

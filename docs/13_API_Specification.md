@@ -92,7 +92,17 @@ Example:
 
 Authorization: Bearer <access_token>
 
-Access tokens are signed JWTs with a 15-minute lifetime.
+Access tokens are signed JWTs with a 15-minute lifetime, signed using HS256 with a symmetric secret.
+
+Access-token claims:
+
+sub (global User ID)
+iat
+exp
+iss (relvio-api)
+aud (relvio-mobile)
+
+The login access token does not contain organization ID, active organization, role, or permission claims.
 
 Refresh tokens are opaque, cryptographically secure random values with a 30-day lifetime. Refresh tokens rotate on every successful refresh. Reuse of an already rotated or revoked refresh token is treated as suspicious and revokes the entire refresh-token family.
 

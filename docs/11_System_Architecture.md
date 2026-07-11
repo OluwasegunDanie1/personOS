@@ -102,6 +102,14 @@ The approved backend implementation technology is:
 
 The backend should expose REST APIs.
 
+### Approved Backend Authentication Packages
+
+- @nestjs/jwt for access-token signing and verification
+- argon2 for password hashing
+- class-validator and class-transformer for request DTO validation
+
+Token hashing and opaque token generation use Node's built-in `crypto` module only; no additional package is approved for that responsibility.
+
 ---
 
 ## Mobile Client Configuration
