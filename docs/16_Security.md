@@ -235,6 +235,29 @@ Logout revokes the active refresh-token session.
 
 Refresh tokens must never be exposed through application logs.
 
+Authenticated Request Boundary
+
+A single global NestJS access-token guard protects all routes except an explicit set of public endpoints, marked using an explicit public-route decorator/metadata mechanism. The current public endpoints are POST /auth/login, POST /auth/refresh, and POST /auth/logout.
+
+The global guard must:
+
+Extract Authorization: Bearer <token>.
+Verify the signed JWT using the already-approved JWT configuration.
+Require a valid sub claim.
+Resolve the User by sub.
+Reject a missing User, a deleted User, and a DISABLED User.
+Attach a minimal authenticated identity to the request: { userId: string }. It must never attach the full Prisma User record, passwordHash, or organization/role/permission context.
+
+Organization switching must never require issuing a replacement access token. The access token remains global-identity-only for its entire lifetime; this guard boundary does not change the approved access-token claim set defined above.
+
+Access-Token Error Codes
+
+AUTHENTICATION_REQUIRED: missing Authorization header, a non-Bearer scheme, or an empty Bearer token.
+INVALID_ACCESS_TOKEN: malformed token, invalid signature, invalid issuer/audience, expired token, missing/invalid sub, or a sub whose User no longer exists or is deleted.
+USER_DISABLED: the resolved User's status is DISABLED.
+
+All three use the standard error envelope. The underlying JWT library's error details must never be exposed to the client.
+
 Development Authentication Fixture Security
 
 A development/test-support mechanism is approved for creating exactly one controlled local User for live local authentication lifecycle verification. Its scope and non-goals (not registration, not a seed framework, not production provisioning) are governed by Deployment.md.
@@ -246,6 +269,16 @@ The fixture must never log: the raw AUTH_FIXTURE_PASSWORD value, the resulting p
 The fixture must refuse to run when NODE_ENV=production. It exists purely as local development/test tooling: it must never be exposed through a public API endpoint and must never be invoked automatically.
 
 This fixture does not weaken any password-security requirement defined elsewhere in this document; the same Argon2id hashing and secret-handling rules apply to the credential it processes.
+
+Development Organization Fixture Security
+
+A second, separate development/test-support mechanism extends the controlled auth-fixture concept to enable live local verification of organization listing and membership enforcement. It may create exactly one Organization, one Role (named Owner) owned by that Organization, and one OrganizationMembership linking the existing controlled fixture User to that Role and Organization. It must create zero Permission, RolePermission, or any product-domain or auth-token record.
+
+This fixture reuses AUTH_FIXTURE_EMAIL only to locate the already-existing controlled User; it must not read or require AUTH_FIXTURE_PASSWORD. It reads the required, non-default AUTH_FIXTURE_ORGANIZATION_NAME environment variable (trimmed, must be non-empty).
+
+The fixture is idempotent; existing matching records must not be mutated (no upsert-that-updates). It must refuse to run when NODE_ENV=production, is invoked manually only, and must never auto-run during application bootstrap, npm install, Prisma generate, Prisma migrate, tests, or build.
+
+This fixture is not product onboarding. It does not implement an organization-creation API and does not replace a future registration/onboarding contract.
 
 Authorization
 
@@ -372,6 +405,33 @@ AND
 person.organization_id = organizationId
 
 Knowing a resource identifier does not grant access to the resource.
+
+Organization Context Mechanism
+
+Relvio v1 does not maintain server-side active-organization session state, does not use an organization header, and does not issue organization-scoped JWTs. After login, the Flutter application calls GET /organizations, selects an organization locally, and supplies that organization ID through the approved {organizationId} path parameter on organization-scoped requests. Organization selection/switching is a Flutter application-context action, not a backend select/switch endpoint; there is no POST /organizations/select or POST /organizations/switch endpoint.
+
+Organization-Membership Enforcement Boundary
+
+A reusable organization-membership guard/boundary protects every route containing {organizationId}. The membership proof tuple is exactly (authenticated userId, path organizationId) — nothing else proves organization access.
+
+This boundary must:
+
+Require authenticated request identity (it consumes request.auth.userId; it must not independently re-verify the JWT).
+Read organizationId from the route path parameter and validate it as a UUID-compatible identifier.
+Query OrganizationMembership using the unique organizationId + userId boundary.
+Reject missing membership by default.
+Resolve the membership's Role, relying on the existing database composite foreign key for same-organization membership-to-role structural integrity.
+Attach minimal organization request context: { organizationId: string, membershipId: string, roleId: string }. It must never attach full Prisma models or permission codes.
+
+Guard order for organization-scoped routes: the global access-token guard runs first; organization-membership enforcement runs second; controller/service business logic runs only after both succeed.
+
+The stable error code for this boundary is ORGANIZATION_ACCESS_DENIED, used for a malformed organizationId, a non-existent organization, a missing membership for the authenticated user, or a membership that cannot resolve its role consistently. This code must never reveal whether another tenant's organization exists.
+
+Path organizationId is a requested tenant context, not proof of access — client-supplied organizationId is never trusted merely because it is present. Membership validation is mandatory before any organization-scoped business logic executes. Organization-scoped Prisma queries must include the validated organizationId where the model directly owns organizationId; indirect tenant-owned models must be reached through validated organization-owned relations rather than a bare foreign-key lookup.
+
+Denied cross-tenant attempts should be auditable once the audit infrastructure for security events is implemented. This document does not define that audit event schema now.
+
+Permission authorization is deferred until a product endpoint requires a specific permission; this boundary does not perform permission checks and no permission-enforcement guard exists yet.
 
 PostgreSQL Organization Isolation
 

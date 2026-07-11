@@ -113,6 +113,35 @@ Authentication failures must return:
 Permission failures must return:
 
 403 Forbidden
+
+Authenticated Request Boundary
+
+A single global NestJS access-token guard protects all routes except the explicitly public endpoints below. Public routes are marked using an explicit public-route decorator/metadata mechanism; they are not merely "unguarded" by omission.
+
+Public endpoints for the current implemented boundary:
+
+POST /auth/login
+POST /auth/refresh
+POST /auth/logout
+
+The global guard:
+
+Extracts Authorization: Bearer <token>.
+Verifies the signed JWT using the already-approved JWT configuration.
+Requires a valid sub claim.
+Resolves the User by sub.
+Rejects a missing User, a deleted User, and a DISABLED User.
+Attaches a minimal authenticated identity to the request: { userId: string }. It never attaches the full Prisma User record, passwordHash, or organization/role/permission context.
+
+Organization switching never requires issuing a replacement access token; the access token remains global-identity-only for its entire lifetime.
+
+Access-Token Error Codes
+
+AUTHENTICATION_REQUIRED: missing Authorization header, non-Bearer scheme, or empty Bearer token.
+INVALID_ACCESS_TOKEN: malformed token, invalid signature, invalid issuer/audience, expired token, missing/invalid sub, or a sub whose User no longer exists or is deleted.
+USER_DISABLED: the resolved User's status is DISABLED.
+
+All three use the standard error envelope. JWT library error details must never be exposed to the client.
 Authentication Endpoints
 Register
 POST /auth/register
@@ -250,10 +279,23 @@ USER_DISABLED
 
 These codes are authoritative for POST /auth/login, POST /auth/refresh, and POST /auth/logout and must not be paired with a conflicting AUTH_-prefixed equivalent for the same condition.
 
+Stable v1 codes for the authenticated-request boundary (all protected routes):
+
+AUTHENTICATION_REQUIRED
+INVALID_ACCESS_TOKEN
+USER_DISABLED
+
+USER_DISABLED is the same stable code used at login; it applies wherever a DISABLED User is resolved, whether during login or during access-token identity resolution.
+
+Stable v1 code for the organization-membership boundary:
+
+ORGANIZATION_ACCESS_DENIED
+
+Used for a malformed organizationId, a non-existent organization, a missing membership for the authenticated user, or a membership that cannot resolve its role consistently. This code must never reveal whether another tenant's organization exists.
+
 Example error codes for other areas:
 
 AUTH_SESSION_EXPIRED
-ORGANIZATION_ACCESS_DENIED
 PERMISSION_DENIED
 PERSON_NOT_FOUND
 PERSON_EMAIL_EXISTS
@@ -267,7 +309,39 @@ Organization Endpoints
 List User Organizations
 GET /organizations
 
-Returns organizations the authenticated user belongs to.
+Authenticated (subject to the global access-token guard). Returns only organizations for which the authenticated User has an OrganizationMembership.
+
+Success response data:
+
+{
+  "organizations": [
+    {
+      "id": "string",
+      "name": "string",
+      "logoUrl": "string | null",
+      "role": {
+        "id": "string",
+        "name": "string"
+      }
+    }
+  ]
+}
+
+Permission codes are not included in this response.
+
+Ordering: organization name ascending, with deterministic secondary ordering by organization id ascending.
+
+Empty state: HTTP 200 with the standard success envelope and:
+
+{
+  "organizations": []
+}
+
+Organization Context Mechanism
+
+Relvio v1 does not maintain server-side active-organization session state, does not use an organization header, and does not issue organization-scoped JWTs. After login, the Flutter application calls GET /organizations, lets the user choose an organization locally, stores the selected organization ID as application context, and supplies that ID through the {organizationId} path parameter already used by every organization-scoped endpoint below. Organization selection/switching is therefore a Flutter application-context action, not a backend select/switch endpoint. There is no POST /organizations/select or POST /organizations/switch endpoint.
+
+Every organization-scoped request below independently validates membership for the authenticated user and the path organizationId using a reusable organization-membership boundary. This boundary runs after the global access-token guard and consumes its resolved userId rather than re-verifying the JWT. It attaches minimal organization request context: { organizationId: string, membershipId: string, roleId: string }. It never attaches full Prisma models or permission codes. Permission authorization itself is deferred until a specific endpoint requires a permission check.
 
 Create Organization
 POST /organizations

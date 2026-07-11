@@ -472,6 +472,24 @@ Credential-handling and security requirements for this fixture are governed by 1
 
 This document defines this fixture's authority boundary only. Implementing the fixture command is authorized as a separate implementation task.
 
+Local Organization Fixture (Development/Test Support)
+
+Relvio approves one additional, separate development/test-support mechanism extending the controlled auth-fixture concept, used solely to enable live local verification of organization listing and organization-membership enforcement.
+
+This fixture is not public registration, signup, production provisioning, initial Owner onboarding as a product workflow, general organization creation, product onboarding, or a general-purpose database seed. It does not implement an organization-creation API and does not replace a future registration/onboarding contract.
+
+Scope: the fixture may create exactly one Organization, one Role (named Owner) owned by that Organization, and one OrganizationMembership linking the existing controlled fixture User to that Role and Organization. It must create zero Permission records, zero RolePermission records, and zero records of any other product-domain or auth-token model.
+
+Input: the fixture reads the required AUTH_FIXTURE_ORGANIZATION_NAME environment variable (trimmed, must be non-empty, no default). It reuses the existing AUTH_FIXTURE_EMAIL only to locate the already-existing controlled fixture User; it must not read or require AUTH_FIXTURE_PASSWORD.
+
+Idempotency: the fixture is idempotent. Existing matching records must not be mutated; no upsert-that-updates is approved.
+
+Execution boundary: the fixture must refuse to run when NODE_ENV=production. It is manual invocation only and must never auto-run during application bootstrap, npm install, Prisma generate, Prisma migrate, tests, or build.
+
+Credential-handling and security requirements for this fixture are governed by 16_Security.md.
+
+This document defines this fixture's authority boundary only. Implementing the fixture command is authorized as a separate implementation task.
+
 Database Deployment
 
 PostgreSQL is the approved primary relational database.

@@ -114,6 +114,17 @@ Token hashing and opaque token generation use Node's built-in `crypto` module on
 
 - @nestjs/throttler for the public authentication rate-limit boundary (POST /auth/login, POST /auth/refresh, POST /auth/logout)
 
+### Approved Request Authorization Architecture
+
+Two ordered, global request-processing boundaries protect the backend:
+
+1. A single global access-token guard, bypassed only by an explicit public-route decorator/metadata mechanism (the current public routes are POST /auth/login, POST /auth/refresh, POST /auth/logout). It verifies the Bearer JWT and attaches minimal authenticated identity `{ userId: string }` to the request as `request.auth`.
+2. A reusable organization-membership boundary applied to routes containing `{organizationId}`. It runs after the access-token guard, consumes `request.auth.userId` (it does not re-verify the JWT), validates the membership tuple (userId, path organizationId), and attaches minimal organization context `{ organizationId, membershipId, roleId }` to the request.
+
+Guard order is fixed: access-token guard first, organization-membership boundary second, controller/service business logic only after both succeed. Neither boundary attaches full Prisma models, passwordHash, or permission codes. Permission-level authorization is a separate, not-yet-introduced boundary, deferred until a specific endpoint requires it.
+
+Full behavioral and error-code detail is governed by 16_Security.md and 13_API_Specification.md.
+
 ---
 
 ## Mobile Client Configuration

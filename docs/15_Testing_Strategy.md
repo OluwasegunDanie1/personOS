@@ -451,6 +451,12 @@ This fixture is test/infrastructure support only. It is not public registration,
 
 The fixture must not run automatically as part of the automated test suite, build, or CI pipeline. It requires an explicit developer command and is separate from the standard `npm test` run.
 
+Live Local Organization Fixture
+
+A second, separate development-only command extends this fixture concept to enable live local verification of organization listing and organization-membership enforcement. It creates exactly one Organization, one Owner Role owned by that Organization, and one OrganizationMembership linking the existing controlled fixture User to that Role and Organization; it creates zero Permission records and zero other product-domain records. Its exact scope, input (AUTH_FIXTURE_ORGANIZATION_NAME), idempotency, and execution-environment authority are governed by Deployment.md and 16_Security.md.
+
+This fixture is test/infrastructure support only. It is not product onboarding and does not implement an organization-creation API. Unit tests for the access-token guard and organization-membership boundary must remain possible with a mocked PrismaService and must not require this fixture or a live database; the fixture exists only to additionally support live verification, and must not run automatically as part of the automated test suite, build, or CI pipeline.
+
 Organization Testing
 
 Verify:
