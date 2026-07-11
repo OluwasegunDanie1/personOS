@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'routing/app_router.dart';
 import 'theme/app_theme.dart';
 
 class RelvioApp extends StatelessWidget {
@@ -7,18 +8,6 @@ class RelvioApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      theme: AppTheme.light(),
-      home: const RelvioBootstrapScreen(),
-    );
-  }
-}
-
-class RelvioBootstrapScreen extends StatelessWidget {
-  const RelvioBootstrapScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: Text('Relvio')));
+    return MaterialApp.router(theme: AppTheme.light(), routerConfig: appRouter);
   }
 }

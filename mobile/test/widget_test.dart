@@ -7,6 +7,7 @@ void main() {
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(const RelvioApp());
+    await tester.pumpAndSettle();
 
     expect(find.text('Relvio'), findsOneWidget);
   });
