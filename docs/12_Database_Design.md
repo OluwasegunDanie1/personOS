@@ -1,7 +1,7 @@
 ---
 Document: Database Design
 Version: 0.1
-Status: Draft
+Status: Approved
 Project: Relvio
 Owner: Engineering Team
 ---
@@ -10,7 +10,7 @@ Owner: Engineering Team
 
 ## Purpose
 
-This document defines the core database structure for Atlas.
+This document defines the core database structure for Relvio.
 
 The database should be simple, scalable, and support multiple organizations without mixing data.
 
@@ -67,7 +67,7 @@ Fields:
 
 ## Users
 
-Stores users who can access Atlas.
+Stores users who can access Relvio.
 
 Fields:
 
@@ -99,10 +99,12 @@ Fields:
 
 Examples:
 
-- Admin
-- Staff
+- Owner
+- Administrator
+- Manager
+- Team Lead
 - Volunteer
-- Viewer
+- Member
 
 ## Role Permissions
 
@@ -128,7 +130,7 @@ Examples:
 
 ## People
 
-The heart of Atlas.
+The heart of Relvio.
 
 Stores everyone managed by the organization.
 

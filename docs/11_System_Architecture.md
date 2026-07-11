@@ -1,7 +1,7 @@
 ---
 Document: System Architecture
 Version: 0.1
-Status: Draft
+Status: Approved
 Project: Relvio
 Owner: Engineering Team
 ---
@@ -10,7 +10,7 @@ Owner: Engineering Team
 
 ## Purpose
 
-This document describes the technical architecture of Atlas.
+This document describes the technical architecture of Relvio.
 
 The goal is to build a scalable, secure, and maintainable platform that can support thousands of organizations.
 
@@ -18,7 +18,7 @@ The goal is to build a scalable, secure, and maintainable platform that can supp
 
 # Architecture Overview
 
-Atlas follows a modern client-server architecture.
+Relvio follows a modern client-server architecture.
 
 ```
 Flutter Mobile App
@@ -85,7 +85,7 @@ Every layer has a single responsibility.
 - Flutter
 - Riverpod
 - GoRouter
-- Dio
+- Dio (approved Flutter HTTP client)
 - Freezed
 - Isar (Offline Database)
 - SharedPreferences / Secure Storage
@@ -94,14 +94,42 @@ Every layer has a single responsibility.
 
 ## Backend
 
-Backend architecture will follow REST principles and a layered architecture (Presentation, Application, Domain, Infrastructure). The implementation technology will be selected before backend development begins.
-Possible options:
+Backend architecture follows REST principles and a layered architecture (Presentation, Application, Domain, Infrastructure).
 
-- Laravel
+The approved backend implementation technology is:
+
 - NestJS
-- ASP.NET Core
 
 The backend should expose REST APIs.
+
+---
+
+## Mobile Client Configuration
+
+The approved Flutter API base-URL configuration strategy is compile-time environment configuration using `--dart-define`.
+
+Configuration key:
+
+```
+API_BASE_URL
+```
+
+Production API URLs must not be hardcoded in Dart source.
+
+### HTTP Timeout Policy
+
+- Connection timeout: 30 seconds
+- Receive timeout: 30 seconds
+
+### HTTP Retry Policy
+
+- No automatic retries for mutation requests (POST, PUT, PATCH, DELETE).
+- Safe/idempotent GET requests may retry a maximum of 2 times.
+- Retry only transient network failures.
+- Do not retry authentication failures.
+- Do not retry validation failures.
+- Do not retry permission failures.
+- Do not retry deterministic 4xx responses.
 
 ---
 
@@ -144,7 +172,7 @@ Support:
 # Multi-Tenant Architecture
 
 
-Atlas is a multi-tenant platform.
+Relvio is a multi-tenant platform.
 
 One application.
 
@@ -154,7 +182,7 @@ Every record must include an organization identifier (organization_id).
 All database queries must be scoped to the authenticated organization.
 
 ```
-Atlas
+Relvio
 
 ├── Church A
 ├── School B

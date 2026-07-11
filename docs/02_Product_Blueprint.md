@@ -130,9 +130,7 @@ Track attendance for any event.
 
 Support:
 
-- QR Code
 - Manual Check-in
-- Self Check-in
 - Bulk Check-in
 
 ---

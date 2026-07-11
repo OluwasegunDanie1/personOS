@@ -1,7 +1,7 @@
 ---
 Document: API Specification
 Version: 0.2
-Status: Draft
+Status: Approved
 Project: Relvio
 Owner: Engineering Team
 ---
@@ -405,7 +405,6 @@ Supported check-in methods may include:
 
 manual
 search
-qr
 walk_in
 offline_sync
 Record Walk-In Visitor

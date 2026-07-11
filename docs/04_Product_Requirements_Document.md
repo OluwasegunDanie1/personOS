@@ -50,15 +50,23 @@ The first release will include:
 
 # User Roles
 
-## Super Admin
+Approved roles are governed by `16_Security.md`.
 
-Platform owner.
+## Owner
 
-Can manage every organization.
+Manages the organization workspace.
+
+Can:
+
+- Invite users
+- Manage settings
+- Create events
+- Manage members
+- View reports
 
 ---
 
-## Organization Admin
+## Administrator
 
 Manages an organization.
 
@@ -72,7 +80,19 @@ Can:
 
 ---
 
-## Staff
+## Manager
+
+Oversees assigned teams and operations.
+
+Example:
+
+- Record attendance
+- Follow up visitors
+- View assigned reports
+
+---
+
+## Team Lead
 
 Can perform assigned tasks.
 
@@ -87,6 +107,14 @@ Example:
 ## Volunteer
 
 Limited access.
+
+Permissions depend on role.
+
+---
+
+## Member
+
+Baseline organization member access.
 
 Permissions depend on role.
 
@@ -135,7 +163,7 @@ Allow organizations to create their workspace.
 ### Acceptance Criteria
 
 - Organization created successfully.
-- Admin becomes workspace owner.
+- The creating user becomes the organization Owner.
 
 ---
 
@@ -232,7 +260,6 @@ Leader
 - Edit Event
 - Delete Event
 - Event Categories
-- Recurring Events
 - Attendance Enabled
 
 ---
@@ -242,8 +269,6 @@ Leader
 ### Methods
 
 - Manual Check-in
-- QR Code (Future)
-- Self Check-in (Future)
 
 ### Features
 
