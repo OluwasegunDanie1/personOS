@@ -235,6 +235,18 @@ Logout revokes the active refresh-token session.
 
 Refresh tokens must never be exposed through application logs.
 
+Development Authentication Fixture Security
+
+A development/test-support mechanism is approved for creating exactly one controlled local User for live local authentication lifecycle verification. Its scope and non-goals (not registration, not a seed framework, not production provisioning) are governed by Deployment.md.
+
+The fixture must reuse the existing PasswordHashService/approved Argon2id primitive without duplicating or reimplementing password-hashing configuration.
+
+The fixture must never log: the raw AUTH_FIXTURE_PASSWORD value, the resulting password hash, or the AUTH_FIXTURE_EMAIL value. No default or hardcoded fixture credentials are approved.
+
+The fixture must refuse to run when NODE_ENV=production. It exists purely as local development/test tooling: it must never be exposed through a public API endpoint and must never be invoked automatically.
+
+This fixture does not weaken any password-security requirement defined elsewhere in this document; the same Argon2id hashing and secret-handling rules apply to the credential it processes.
+
 Authorization
 
 Relvio uses role and permission-based authorization.

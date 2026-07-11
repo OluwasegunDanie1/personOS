@@ -443,6 +443,14 @@ Forgot-password responses must not reveal whether an email exists.
 
 Authentication tokens must never appear in test logs or screenshots.
 
+Live Local Authentication Fixture
+
+In addition to automated test fixtures (see Test Data), Relvio approves one separate, explicit, development-only command that creates exactly one controlled global User. Its sole purpose is manual, live local verification of the full authentication lifecycle against a real local backend and local database: login, refresh rotation, reuse of the revoked old refresh token and family revocation, a fresh login, logout, and reuse of the logged-out refresh token.
+
+This fixture is test/infrastructure support only. It is not public registration, product onboarding, or a general-purpose database seed. Its exact scope, input, idempotency, and execution-environment authority are governed by Deployment.md and 16_Security.md.
+
+The fixture must not run automatically as part of the automated test suite, build, or CI pipeline. It requires an explicit developer command and is separate from the standard `npm test` run.
+
 Organization Testing
 
 Verify:

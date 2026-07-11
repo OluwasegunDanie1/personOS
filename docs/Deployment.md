@@ -403,6 +403,23 @@ Backend authentication configuration must fail clearly when JWT_ACCESS_SECRET is
 
 For the minimal login, refresh, and logout implementation phase, JWT_ACCESS_SECRET is the only newly required authentication secret. Refresh, email-verification, and password-reset tokens are opaque random values that are hashed for storage and do not require a separate signing secret.
 
+Local Backend Runtime Environment Loading
+
+The local NestJS backend runtime must load backend/.env before any module or configuration primitive reads process.env, including during application bootstrap. The already-approved dotenv package is approved for this purpose. Do not approve a second configuration or environment-loading package merely for this responsibility.
+
+The standard local development start command must load backend/.env automatically. A developer must not be required to manually prepend a one-off Node preload flag to start the backend locally.
+
+Requirements:
+
+backend/.env remains Git-ignored.
+No environment value may be logged.
+No hardcoded DATABASE_URL fallback.
+No hardcoded JWT_ACCESS_SECRET fallback.
+Production must continue receiving secrets from the deployment environment and must not depend on a committed .env file.
+Environment loading must occur before modules or configuration primitives read process.env.
+
+This document defines this authority boundary only. Implementing the loading mechanism is authorized as a separate implementation task.
+
 Trust-Proxy Environment Configuration
 
 TRUST_PROXY is the approved backend environment variable controlling Express trust proxy configuration for the public authentication rate-limit boundary. Its value is the explicitly configured trusted proxy hop count, expressed as a positive integer. It has no hardcoded fallback.
@@ -434,6 +451,26 @@ Email verification delivery provider/mechanism
 Password-reset delivery provider/mechanism
 
 Do not implement email verification or password-reset delivery until delivery infrastructure is approved.
+
+Local Authentication Fixture (Development/Test Support)
+
+Relvio approves exactly one development/test-support mechanism for creating a controlled local authentication fixture. Its sole purpose is to enable manual, live local verification of the following authentication lifecycle against a real local backend and local database: login, refresh rotation, reuse of the revoked old refresh token and family revocation, a fresh login, logout, and reuse of the logged-out refresh token. The fixture itself must not perform this lifecycle; it only creates the controlled User needed to exercise it manually.
+
+This fixture is not: public registration, signup, production user provisioning, initial Owner creation, organization creation, product onboarding, or a general-purpose database seed. It does not implement, replace, or weaken the future POST /auth/register product registration workflow, which remains a separately governed contract under 13_API_Specification.md.
+
+Scope: the fixture may create exactly one global User record. It must not create an Organization, OrganizationMembership, Role, Permission, Person, Event, Attendance, any other product-domain record, a refresh token, an email-verification token, or a password-reset token.
+
+Input: the fixture reads exactly two local environment variables, AUTH_FIXTURE_EMAIL and AUTH_FIXTURE_PASSWORD. Both are required; an absent or empty value must fail clearly. No default or hardcoded fixture credentials are approved.
+
+User shape: email is normalized using trim and lowercase; passwordHash is produced using the existing PasswordHashService/approved Argon2id primitive, with no duplicated Argon2 configuration; phone is null; status is ACTIVE; lastLogin is null; deletedAt is null. Database-default fields apply normally. No email-verification state is invented, since the approved User schema has no such field.
+
+Idempotency: the fixture is idempotent for the normalized fixture email. If no matching User exists, it creates the controlled User. If a matching User already exists, the fixture must not create a duplicate and must not overwrite passwordHash, status, phone, lastLogin, or deletedAt; it completes successfully without modification. A Prisma upsert that would update an existing User is not approved for this purpose.
+
+Execution boundary: the fixture must refuse to run when NODE_ENV=production. It is approved for explicit, manual developer invocation under NODE_ENV=development, and for explicit test invocation under NODE_ENV=test. It must never run automatically during application bootstrap, npm install, Prisma generate, Prisma migrate, automated test runs, or build. No Prisma seed hook and no general-purpose seed framework are approved for this mechanism.
+
+Credential-handling and security requirements for this fixture are governed by 16_Security.md.
+
+This document defines this fixture's authority boundary only. Implementing the fixture command is authorized as a separate implementation task.
 
 Database Deployment
 
