@@ -12,6 +12,12 @@ describe('AppModule', () => {
     process.env.DATABASE_URL ??=
       'postgresql://test:test@localhost:5432/relvio_test';
 
+    // SecurityModule's JwtModule factory requires JWT_ACCESS_SECRET to be
+    // present at module construction. This placeholder is never used to sign
+    // a real token; only module compilation and dependency wiring are
+    // verified here.
+    process.env.JWT_ACCESS_SECRET ??= 'test-only-placeholder-secret';
+
     moduleRef = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
