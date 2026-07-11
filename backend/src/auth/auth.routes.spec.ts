@@ -64,22 +64,25 @@ describe('Auth route composition', () => {
     });
   }
 
-  it('resolves POST /api/v1/auth/login', async () => {
+  it('resolves POST /api/v1/auth/login and remains public (no access token supplied)', async () => {
     const status = await post('/api/v1/auth/login', { email: 'not-an-email', password: '' });
 
     expect(status).not.toBe(404);
+    expect(status).not.toBe(401);
   });
 
-  it('resolves POST /api/v1/auth/refresh', async () => {
+  it('resolves POST /api/v1/auth/refresh and remains public (no access token supplied)', async () => {
     const status = await post('/api/v1/auth/refresh', { refreshToken: '' });
 
     expect(status).not.toBe(404);
+    expect(status).not.toBe(401);
   });
 
-  it('resolves POST /api/v1/auth/logout', async () => {
+  it('resolves POST /api/v1/auth/logout and remains public (no access token supplied)', async () => {
     const status = await post('/api/v1/auth/logout', { refreshToken: '' });
 
     expect(status).not.toBe(404);
+    expect(status).not.toBe(401);
   });
 
   it('does not register auth routes outside the /api/v1 prefix', async () => {

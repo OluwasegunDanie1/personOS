@@ -50,4 +50,54 @@ describe('AccessTokenService', () => {
     expect(decoded).not.toHaveProperty('role');
     expect(decoded).not.toHaveProperty('permissions');
   });
+
+  describe('verify', () => {
+    it('verifies a token signed with the approved configuration', async () => {
+      const token = accessTokenService.sign('user-123');
+
+      const payload = await accessTokenService.verify(token);
+
+      expect(payload.sub).toBe('user-123');
+    });
+
+    it('rejects a token with a different issuer', async () => {
+      const otherIssuerService = new JwtService({
+        secret: testSecret,
+        signOptions: { algorithm: JWT_ALGORITHM, issuer: 'someone-else', audience: JWT_AUDIENCE },
+      });
+      const token = otherIssuerService.sign({ sub: 'user-123' });
+
+      await expect(accessTokenService.verify(token)).rejects.toThrow();
+    });
+
+    it('rejects a token with a different audience', async () => {
+      const otherAudienceService = new JwtService({
+        secret: testSecret,
+        signOptions: { algorithm: JWT_ALGORITHM, issuer: JWT_ISSUER, audience: 'someone-else' },
+      });
+      const token = otherAudienceService.sign({ sub: 'user-123' });
+
+      await expect(accessTokenService.verify(token)).rejects.toThrow();
+    });
+
+    it('rejects a token signed with a different secret', async () => {
+      const otherSecretService = new JwtService({
+        secret: 'a-different-secret',
+        signOptions: { algorithm: JWT_ALGORITHM, issuer: JWT_ISSUER, audience: JWT_AUDIENCE },
+      });
+      const token = otherSecretService.sign({ sub: 'user-123' });
+
+      await expect(accessTokenService.verify(token)).rejects.toThrow();
+    });
+
+    it('rejects an expired token', async () => {
+      const expiredService = new JwtService({
+        secret: testSecret,
+        signOptions: { algorithm: JWT_ALGORITHM, issuer: JWT_ISSUER, audience: JWT_AUDIENCE, expiresIn: -1 },
+      });
+      const token = expiredService.sign({ sub: 'user-123' });
+
+      await expect(accessTokenService.verify(token)).rejects.toThrow();
+    });
+  });
 });
