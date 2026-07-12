@@ -10,7 +10,8 @@
     "test": "jest",
     "fixture:auth": "ts-node src/dev/auth-fixture.ts",
     "fixture:organization": "ts-node src/dev/organization-fixture.ts",
-    "fixture:person": "ts-node src/dev/person-fixture.ts"
+    "fixture:person": "ts-node src/dev/person-fixture.ts",
+    "fixture:journey": "ts-node src/dev/journey-fixture.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.28",
