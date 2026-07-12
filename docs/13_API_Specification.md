@@ -436,7 +436,7 @@ Only non-deleted Persons are returned (deletedAt IS NULL).
 
 search: trimmed; an empty trimmed value behaves as no search; case-insensitive; matches firstName, lastName, email, or phone (OR semantics).
 
-journeyStageId: returns Persons whose current journey stage matches. For v1, current journey stage is the most recent PersonJourneyHistory record by changedAt descending, then id descending; a Person with no journey history does not match any journeyStageId. The supplied journeyStageId must belong to the validated organization; if it does not exist there, return JOURNEY_STAGE_NOT_FOUND.
+journeyStageId: returns Persons whose current journey stage matches. For v1, current journey stage is the most recent PersonJourneyHistory record by movedAt descending, then id descending (movedAt is the approved PersonJourneyHistory timestamp field); a Person with no journey history does not match any journeyStageId. The supplied journeyStageId must belong to the validated organization; if it does not exist there, return JOURNEY_STAGE_NOT_FOUND.
 
 status: ACTIVE or INACTIVE only.
 
