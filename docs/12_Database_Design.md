@@ -64,6 +64,10 @@ Fields:
 - created_at
 - updated_at
 
+slug is a required, unique, non-null column. It is never client-supplied and is not exposed by the approved v1 Organization API (Create, Detail, or Update); the v1 API sets it internally to the newly created Organization's own id at creation, purely to satisfy this database constraint. This is a mechanical persistence detail, not a human-readable or URL-facing slug scheme; no slugification, collision-retry, or vanity-URL behavior is approved or implemented.
+
+industry, logo, email, phone, address, country, timezone, and subscription_plan are not user-facing v1 Organization setup/API fields. Their existence as schema columns does not authorize API or UI exposure. The closed v1 Organization API surface (13_API_Specification.md) accepts and returns only name.
+
 ---
 
 ## Users

@@ -464,9 +464,21 @@ person.organization_id = organizationId
 
 Knowing a resource identifier does not grant access to the resource.
 
+Organization Creation Authority
+
+POST /organizations requires only the global access-token guard. OrganizationMembershipGuard must never be applied to this route, since the target Organization does not exist until the request succeeds. The creator identity is always request.auth.userId; the request body never accepts a userId, ownerId, or role field.
+
+Organization creation is one atomic transaction: exactly one Organization row, exactly one Role row named "Owner" scoped to that new Organization, and exactly one OrganizationMembership row linking the creator, the new Organization, and that new Role. This is not a global/dynamic role catalogue: Role remains organization-owned (per the approved Database Design), so "Owner" is freshly created per Organization, never looked up from a shared or global row, and the client never supplies or influences the role name. This extends, into the real creation path, the exact "Owner" naming convention already established by the approved Organization Fixture (see Development Organization Fixture Security below), which explicitly anticipated this: "This fixture is not product onboarding. It does not implement an organization-creation API and does not replace a future registration/onboarding contract." Zero Permission or RolePermission rows are created; permission enforcement remains deferred, consistent with every other implemented domain. If any part of the transaction fails, no Organization, Role, or OrganizationMembership row persists.
+
+No Invitation model or workflow is introduced by Organization creation. The creator's membership is established directly and immediately; no second membership-creation endpoint and no invitation-acceptance step exists or is required for the creator.
+
 Organization Context Mechanism
 
-Relvio v1 does not maintain server-side active-organization session state, does not use an organization header, and does not issue organization-scoped JWTs. After login, the Flutter application calls GET /organizations, selects an organization locally, and supplies that organization ID through the approved {organizationId} path parameter on organization-scoped requests. Organization selection/switching is a Flutter application-context action, not a backend select/switch endpoint; there is no POST /organizations/select or POST /organizations/switch endpoint.
+Relvio v1 does not maintain server-side active-organization session state, does not use an organization header, and does not issue organization-scoped JWTs. After login, the Flutter application calls GET /organizations, selects an organization locally, and supplies that organization ID through the approved {organizationId} path parameter on organization-scoped requests. Organization selection/switching is a Flutter application-context action, not a backend select/switch endpoint; there is no POST /organizations/select or POST /organizations/switch endpoint. Immediately after a successful Create Organization, the same mechanism applies unchanged: the client calls GET /organizations and finds the new Organization already present with role name "Owner."
+
+Organization Detail and Update Tenant Isolation
+
+GET /organizations/{organizationId} and PATCH /organizations/{organizationId} both require OrganizationMembershipGuard and are scoped by id = organizationId; Organization has no deletedAt column. An absent or non-member Organization returns ORGANIZATION_ACCESS_DENIED — the same code the membership guard already produces — without disclosing whether the Organization exists for other tenants. No role-specific (Owner-only or Administrator-only) restriction is approved for Update Organization in v1; this is an explicit, temporary, membership-only boundary pending a future approved permission-enforcement slice, and must not be tightened or invented ad hoc during implementation.
 
 Organization-Membership Enforcement Boundary
 

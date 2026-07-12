@@ -465,20 +465,18 @@ Unit tests for People list/detail logic must remain possible with a mocked Prism
 
 Organization Testing
 
+Create/View/Update Organization are resolved and testable. Delete Organization, invitations, member role update, and member removal remain unresolved and deferred; do not write tests asserting behavior for them until a separate authority resolution defines their contract.
+
 Verify:
 
-Create organization
-View organization
-Update organization
-Delete organization behaviour
+Create organization: accepts only {name}; rejects industry/logoUrl/country/timezone/role/ownerId/setupComplete as unknown fields; requires only the global access-token guard (not OrganizationMembershipGuard, since the Organization does not yet exist); creator identity comes from request.auth.userId, never the request body
+Create organization atomically creates exactly one Organization, one Role named "Owner" scoped to that Organization, and one OrganizationMembership linking the creator, that Organization, and that Role — zero Permission/RolePermission rows
+Immediately after creation, the creator can call any OrganizationMembershipGuard-protected endpoint (e.g. GET .../people, GET .../reports/dashboard) against the new organizationId without any fixture
+GET /organizations lists the newly created Organization for its creator, with role name "Owner"
+View organization: requires OrganizationMembershipGuard; returns exactly {id, name}; a non-member or absent organizationId returns ORGANIZATION_ACCESS_DENIED
+Update organization: requires OrganizationMembershipGuard; accepts only {name}; at least one field (name) required; any active member may update it (no Owner-only/role-specific restriction is enforced in v1); rejects industry/logoUrl/country/timezone/role/ownerId as unknown fields
+Neither Create, View, nor Update Organization ever returns industry, logoUrl, country, timezone, email, phone, address, or subscriptionPlan
 Organization membership
-Invitation creation
-Invitation acceptance
-Expired invitation
-Invalid invitation
-Revoked invitation
-Member role update
-Member removal
 Organization switching
 
 When switching organizations, verify that:

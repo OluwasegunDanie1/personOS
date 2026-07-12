@@ -359,20 +359,74 @@ Every organization-scoped request below independently validates membership for t
 Create Organization
 POST /organizations
 
-Creates a new organization.
+Requires the global access-token guard only; it is never organization-scoped (the Organization does not yet exist) and OrganizationMembershipGuard must not be applied to this route. The creator identity is always request.auth.userId from the validated access token; the request body never accepts a userId or creator field.
 
-The authenticated user becomes the organization owner.
+Request fields (no others accepted):
+
+{ "name": "string" }
+
+name is required, trimmed, and must remain non-empty after trim. There is no maximum length beyond what the existing validation conventions already impose, no slug field, and no uniqueness constraint on name — two Organizations may share the same name. The request never accepts industry, logoUrl, country, timezone, role, ownerId, setupComplete, status, or any billing/plan field; all are rejected as unknown fields by the existing global ValidationPipe.
+
+Creation is one atomic operation (a single Prisma transaction) creating exactly three rows: the Organization; exactly one Role named "Owner" scoped to that new Organization (organizationId = the new Organization's id); and exactly one OrganizationMembership linking the authenticated creator User, the new Organization, and that new Role. This mirrors the naming convention already established by the approved Organization Fixture (16_Security.md, Deployment.md), extended here into the real, non-fixture creation path. Zero Permission or RolePermission rows are created; permission enforcement remains deferred as it is everywhere else in v1. If any part of this transaction fails, no Organization, Role, or OrganizationMembership row is left behind (no orphan Organization).
+
+The database's required, unique slug column is set internally to the new Organization's own generated id. This is a mechanical detail to satisfy a non-null unique database constraint; it is never accepted from or returned to the client, and no human-readable slug scheme is implemented.
+
+Success response data (HTTP 201, standard success envelope):
+
+{
+  "organization": {
+    "id": "string",
+    "name": "string"
+  }
+}
+
+Immediately after creation, the creator is an active member of the new Organization: GET /organizations returns the new Organization in the caller's list (with role name "Owner"), and every existing OrganizationMembershipGuard-protected endpoint (People, Journey, Events, Attendance, Follow-Ups, Dashboard Summary) works against the new organizationId without any fixture or manual provisioning step.
 
 Get Organization
 GET /organizations/{organizationId}
+
+Requires the global access-token guard, OrganizationMembershipGuard, and a validated request.organization context, identically to every other organization-scoped endpoint. Service-level access is scoped by id = organizationId (no separate deletedAt column exists on Organization). An absent or non-member-accessible Organization returns ORGANIZATION_ACCESS_DENIED — the existing membership-boundary code — never a distinct not-found code, since OrganizationMembershipGuard already rejects before the handler runs.
+
+Success response data:
+
+{
+  "organization": {
+    "id": "string",
+    "name": "string"
+  }
+}
+
+industry, logoUrl, country, timezone, email, phone, address, and subscriptionPlan are not included; this document does not approve exposing them.
+
 Update Organization
 PATCH /organizations/{organizationId}
+
+Requires the global access-token guard, OrganizationMembershipGuard, and a validated request.organization context. No role-specific restriction is approved for this endpoint in v1: any active member may update name; there is no Owner-only or Administrator-only enforcement, because v1 has no approved permission-enforcement mechanism. This membership-only boundary is explicit and temporary pending a future approved role/permission slice.
+
+Mutable fields (no others accepted): { "name": "string" }. name is the only approved mutable field; at least one accepted field (i.e. name) must be supplied, trimmed, and non-empty. industry, logoUrl, country, timezone, role, ownerId, and any setup-state or billing/plan field are rejected as unknown fields.
+
+Success response data matches Get Organization's shape. An absent or non-member-accessible Organization returns ORGANIZATION_ACCESS_DENIED.
+
 Delete Organization
 DELETE /organizations/{organizationId}
 
-Restricted to authorized organization owners.
+Deferred and unresolved. This path is named only as a placeholder; hard delete, soft delete, archive, cascade, and ownership-transfer semantics are not defined and must not be implemented from this bare path.
 
-Organization deletion should use the approved deletion and retention strategy.
+Organization Setup
+
+Organization Setup is not a separate persisted lifecycle or state in v1. There is no setupComplete, onboardingComplete, setupCompletedAt, onboardingStep, or any setup-status/progress field, and no separate setup-completion endpoint. Successful Create Organization (which atomically establishes the creator's membership) is, by itself, a usable organization context: the Flutter Organization Setup screen may collect and display only the name field actually supported by this contract; any other visually present field must not be wired to a backend capability until separately approved.
+
+Server-Side Active-Organization Selection
+
+Unchanged from the existing Organization Context Mechanism above: there is no server-side active-organization session, no organization-switch endpoint, and no organization header. GET /organizations (unchanged, see List User Organizations above) remains the sole mechanism for the client to discover organization membership/context after Create Organization succeeds.
+
+Organization-Domain Error Codes
+
+ORGANIZATION_ACCESS_DENIED: reused unchanged from the existing organization-membership boundary; used for View/Update when the organizationId is absent or the authenticated user is not an active member, without disclosing which case applies.
+
+There is no dedicated public error code for a Create Organization transaction failure (for example, the "Owner" Role or OrganizationMembership insert failing within the same atomic transaction as the Organization insert). Since the "Owner" Role is always freshly created within the same transaction rather than looked up, this is not a distinct business condition; a failure here is a plain, internal, unexpected error. It surfaces as a generic 500 through the existing GlobalExceptionFilter, exactly as JourneyModule's OperationalTemplateService already does for its own internal template-invariant failure (see Journey Stage Endpoints above) — no new client-facing error code is invented, and the client must never be told it supplied invalid data for this failure.
+
+Neither this document nor any Organization endpoint defines a dynamic/global Role catalogue, an Invitation model or workflow, a userId/role field on Create Organization, or an Owner-only/Administrator-only update restriction; none of these are approved v1 behavior.
 
 Organization Invitations
 Create Invitation
