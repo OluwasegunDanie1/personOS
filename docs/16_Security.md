@@ -334,6 +334,10 @@ Follow-Up Assignment Tenant Rule
 
 assignedTo references a global User directly, exactly like Event.createdBy and Attendance.checkedInBy. Global User existence is never sufficient authorization: an assignedTo value must resolve to a User holding an active OrganizationMembership for the validated organization context (the same organizationId_userId membership lookup used by OrganizationMembershipGuard), else ASSIGNED_USER_NOT_FOUND. A User who is a member of a different organization, or of no organization, must be rejected identically to a nonexistent User, without disclosing which case applies.
 
+Dashboard Summary Tenant Isolation
+
+Dashboard Summary is a read-only aggregate over People, FollowUp, and Event, each already organization-owned. Every one of its source queries (the People count, the FollowUp count, and the Event query) must explicitly filter by the validated organizationId; none may run unscoped. An aggregate query that omits organizationId is a cross-tenant data leakage defect under the existing Cross-Organization Data Leakage severity classification above, identical in severity to leaking a single record. No Dashboard-specific role or permission restriction is approved beyond active organization membership; do not invent one.
+
 Authorization
 
 Relvio uses role and permission-based authorization.

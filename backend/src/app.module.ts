@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { AuthModule } from './auth/auth.module';
 import { AccessTokenGuard } from './common/guards/access-token.guard';
+import { DashboardModule } from './dashboard/dashboard.module';
 import { DatabaseModule } from './database/database.module';
 import { EventsModule } from './events/events.module';
 import { FollowUpsModule } from './follow-ups/follow-ups.module';
@@ -20,6 +21,7 @@ import { SecurityModule } from './security/security.module';
     JourneyModule,
     EventsModule,
     FollowUpsModule,
+    DashboardModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: AccessTokenGuard }],
 })

@@ -1215,8 +1215,37 @@ GET /organizations/{organizationId}/roles/{roleId}/permissions
 Update Role Permissions
 PATCH /organizations/{organizationId}/roles/{roleId}/permissions
 Reports
+
+Dashboard Summary is resolved below. Attendance Report, Growth Report, Follow-Up Report, and Export Report remain unresolved and deferred; no field contract, formula, or export mechanism is approved for them. Do not implement them from the bare paths below.
+
 Dashboard Summary
 GET /organizations/{organizationId}/reports/dashboard
+
+Dashboard Summary is a single, read-only, organization-scoped aggregate endpoint. It requires the global access-token guard, OrganizationMembershipGuard membership validation, and a validated request.organization context, identically to every other organization-scoped endpoint. It accepts no query parameters; any supplied query parameter is rejected by the existing global validation behavior. There is no Dashboard-specific error code: authentication, membership, and validation failures use the existing established codes (AUTHENTICATION_REQUIRED, INVALID_ACCESS_TOKEN, ORGANIZATION_ACCESS_DENIED). Dashboard Summary is exactly one endpoint; it is never split into multiple endpoints, and no generic analytics or metrics endpoint is approved.
+
+Success response data:
+
+{
+  "totalPeople": 0,
+  "newPeople": 0,
+  "pendingFollowUps": 0,
+  "upcomingEvents": [
+    { "id": "string", "title": "string", "startDate": "string" }
+  ]
+}
+
+totalPeople: count of People in the validated organization where deletedAt IS NULL and status = ACTIVE. INACTIVE and soft-deleted People are excluded. This is a current operational count, not a historical total.
+
+newPeople: count of People in the validated organization matching the same totalPeople filter (deletedAt IS NULL, status = ACTIVE), additionally restricted to createdAt >= the start of the current UTC calendar day (00:00:00.000Z). There is no query parameter for a custom date window, no previous-period comparison, and no growth percentage; this document does not approve any of those.
+
+pendingFollowUps: count of FollowUps in the validated organization whose status is PENDING or IN_PROGRESS. COMPLETED FollowUps are excluded. There is no overdue count and no reminder-state derivation.
+
+upcomingEvents: the next 5 non-deleted Events in the validated organization (deletedAt IS NULL) whose startDate is greater than or equal to the current server UTC instant, ordered by startDate ascending then id ascending (deterministic tie-break). There is no fixed future cutoff window beyond "the next 5"; there is no status/cancelled filtering, since Event has no such column. Each entry reuses the same minimal Event reference shape already approved for the Person Attendance history endpoint (id, title, startDate) — no new Event persistence field or Dashboard-specific Event shape is introduced.
+
+Not approved for v1 Dashboard Summary, and therefore never present in the response: attendanceRate, attendancePercentage (no approved denominator exists — Attendance has no expected-attendee, roster, RSVP, or capacity concept), todayAttendance (no Approved-status document establishes this requirement; it appears only in Draft/Atlas-era material, which is not authority), recentActivity (no persisted Timeline/Activity model exists), journeyStageDistribution (Journey history is immutable and per-transition; it is never aggregated as a current-stage snapshot), growth, trend, comparison percentages, overdueFollowUps, or any report metadata.
+
+All Dashboard Summary time semantics use UTC exclusively. There is no organization timezone setting, no client/device timezone inference, and no timezone query parameter.
+
 Attendance Report
 GET /organizations/{organizationId}/reports/attendance
 Growth Report

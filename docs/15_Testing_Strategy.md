@@ -746,21 +746,22 @@ A user must never access another user's notifications.
 
 Reports Testing
 
-Verify:
+Dashboard Summary is resolved and testable (see Dashboard Summary Testing below). Attendance report, Growth report, Follow-up report, date filtering, event filtering, community filtering, and report calculations remain unresolved and deferred; do not write tests asserting behavior for them until a separate authority resolution defines their contract.
 
-Dashboard summary
-Attendance report
-Growth report
-Follow-up report
-Date filtering
-Event filtering
-Community filtering where supported
-Empty reports
-Report calculations
+Dashboard Summary Testing
 
-Report values should be tested against known datasets.
+Dashboard Summary (GET /organizations/{organizationId}/reports/dashboard) is a single, no-query-parameter, organization-scoped aggregate endpoint. Verify:
 
-Do not test report accuracy only by visually inspecting charts.
+totalPeople counts only non-deleted, ACTIVE People in the validated organization; INACTIVE and soft-deleted People are excluded
+newPeople additionally requires createdAt >= the start of the current UTC calendar day (00:00:00.000Z); no custom date-range query parameter exists
+pendingFollowUps counts only PENDING and IN_PROGRESS FollowUps; COMPLETED is excluded
+upcomingEvents returns at most 5 non-deleted Events with startDate >= the current server UTC instant, ordered startDate ascending then id ascending, using the shape {id, title, startDate}
+Empty state: all counts are 0 and upcomingEvents is an empty array when the organization has no matching records
+Cross-tenant isolation: every count/query is scoped by organizationId; a second organization's People/FollowUps/Events must never affect the response
+An unsupported query parameter is rejected by the existing global validation behavior
+The response never includes attendanceRate, attendancePercentage, todayAttendance, recentActivity, journeyStageDistribution, growth, trend, comparison percentages, or overdueFollowUps
+
+Report values (once a future task resolves the deferred report types) should be tested against known datasets. Do not test report accuracy only by visually inspecting charts.
 
 Report Export Testing
 
