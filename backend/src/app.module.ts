@@ -3,10 +3,11 @@ import { APP_GUARD } from '@nestjs/core';
 import { AuthModule } from './auth/auth.module';
 import { AccessTokenGuard } from './common/guards/access-token.guard';
 import { DatabaseModule } from './database/database.module';
+import { OrganizationsModule } from './organizations/organizations.module';
 import { SecurityModule } from './security/security.module';
 
 @Module({
-  imports: [DatabaseModule, SecurityModule, AuthModule],
+  imports: [DatabaseModule, SecurityModule, AuthModule, OrganizationsModule],
   providers: [{ provide: APP_GUARD, useClass: AccessTokenGuard }],
 })
 export class AppModule {}
