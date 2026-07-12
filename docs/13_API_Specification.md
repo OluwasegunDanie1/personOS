@@ -1154,6 +1154,9 @@ POST /organizations/{organizationId}/communities/{communityId}/members
 Remove Person From Community
 DELETE /organizations/{organizationId}/communities/{communityId}/members/{personId}
 Conversations
+
+Messages is a frozen v1 UI navigation destination whose production backend remains explicitly deferred (12_Database_Design.md lists Messages under "Future Tables — not required for MVP"; no Conversation/Message Prisma model exists). The bare paths below are not field-complete and are not implementation-ready: they carry no approved request fields, response shapes, participant-identity model, pagination/sort contract, or error codes. Do not implement a production messaging backend from these paths. Do not build a fake/local-only conversation store to back the frozen Messages screen. The approved pre-backend v1 behavior for the Messages destination is defined in Mvp_scope.md ("Messages Navigation") and User_Flow.md ("Messages Navigation Flow"): the frozen screen shell remains routable and renders a neutral unavailable/not-yet-connected content state, with zero calls to any path below and non-functional compose/send controls.
+
 List Conversations
 GET /organizations/{organizationId}/conversations
 Create Conversation

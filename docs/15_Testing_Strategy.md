@@ -673,18 +673,16 @@ Person relationship (personId) tenant-scoped exactly like other People-referenci
 Communication Testing
 Conversations and Messages
 
-Verify:
+Production messaging backend behavior (list/create/view conversation, list/send message, mark read, cursor pagination, delivery-status transitions) remains unresolved and deferred; the bare API paths in 13_API_Specification.md are not field-complete. Do not write tests asserting real backend behavior for them until a separate authority resolution defines their contract.
 
-List conversations
-Create conversation
-View conversation
-List messages
-Send message
-Mark conversation read
-Cursor pagination
-Empty conversation state
+Until then, verify only the approved frozen-UI pre-backend behavior (Mvp_scope.md "Messages Navigation"; User_Flow.md "Messages Navigation Flow"):
 
-Where delivery status exists, verify supported status transitions.
+Messages remains reachable from primary navigation (not removed, renamed, or replaced)
+The frozen Messages screen shell/header/navigation chrome renders
+The content region shows a neutral unavailable/not-yet-connected state, with no invented conversation rows, unread counts, groups, or announcements
+Zero calls are made to any Conversations/Messages API path
+Zero local fake conversations/messages are created
+Compose/new-message controls are disabled or non-functional, never silently succeeding
 
 Announcements
 

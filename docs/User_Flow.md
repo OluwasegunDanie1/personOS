@@ -581,6 +581,16 @@ Export
 
 workflow unless the approved UI and implementation documentation define it.
 
+Primary Navigation Order
+
+The final Relvio v1 primary bottom navigation contains exactly five ordered destinations:
+
+Home → People → Events → Messages → Workspace
+
+This order is frozen for v1. Messages is the fourth destination; Workspace is the fifth and final destination. Do not substitute Dashboard for Home, More or Settings for Workspace, or Attendance/Follow-ups for Messages, and do not add a sixth destination. Attendance and Follow-ups are approved product areas reached through their own approved flows/routes, not primary-navigation substitutes.
+
+The "Relvio Product Specification" document's responsibility-area sequence (Dashboard → People → Events → Attendance → Messages → Workspace) is a product responsibility-area illustration, not navigation order; this section is the controlling navigation authority.
+
 Workspace Flow
 
 The approved primary bottom navigation label is:
@@ -617,6 +627,26 @@ Future-feature links
 unless explicitly approved.
 
 The visible Workspace content must match the frozen UI and approved product scope.
+
+Messages Navigation Flow
+
+Messages remains the fourth of the five frozen Relvio v1 primary bottom-navigation destinations (see "Primary Navigation Order" above). Frozen UI presence does not by itself authorize a production messaging backend; production messaging persistence remains deferred (see Mvp_scope.md, 12_Database_Design.md).
+
+Conceptually, while production messaging backend authority remains deferred:
+
+Primary Navigation
+↓
+Messages
+↓
+Frozen Messages Screen Shell (header/navigation chrome only)
+↓
+Neutral Unavailable/Not-Yet-Connected Content State
+
+Do not render invented conversation rows, unread counts, groups, or announcements in this state. Do not perform any Messages/Conversations API call while this state is in effect. Do not create local fake conversations or messages. Compose/new-message controls must be disabled or non-functional while backend authority is deferred; they must not silently no-op or appear to succeed.
+
+Do not remove Messages from primary navigation to work around the deferred backend. Do not replace it with another destination. Do not invent an interim messaging backend, participant model, or real-time delivery mechanism to make this screen appear functional.
+
+Real Messages/Conversations integration may begin only after a separate, explicit authority decision promotes production messaging into approved MVP scope and resolves persistence, participant identity, tenant/conversation-membership security, field-complete API contracts, pagination/sort, send/read semantics, and the notification-side-effect boundary.
 
 Notification Flow Boundary
 

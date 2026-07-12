@@ -337,6 +337,41 @@ Advanced analytics and predictive insights are not approved v1 scope.
 
 ---
 
+# Primary Navigation
+
+The final Relvio v1 primary bottom navigation contains exactly five ordered destinations:
+
+1. **Home**
+2. **People**
+3. **Events**
+4. **Messages**
+5. **Workspace**
+
+Exact ordered label sequence:
+
+**Home → People → Events → Messages → Workspace**
+
+This order is frozen for v1. Messages is the fourth primary navigation destination; Workspace is the fifth and final primary navigation destination.
+
+Do not substitute:
+
+- Dashboard for Home
+- More for Workspace
+- Settings for Workspace
+- Attendance for Messages
+- Follow-ups for Messages
+- any other destination
+
+Do not add a sixth primary navigation item.
+
+Attendance and Follow-ups are approved product areas/screens, reached through their own approved flows and routes; they do not replace any of the five primary bottom-navigation destinations.
+
+Backend implementation status does not authorize removing, replacing, reordering, renaming, or hiding a frozen primary navigation destination. Messages remains in navigation while its production backend is deferred, following the approved deferred-state behavior contract defined below ("Messages Navigation").
+
+The "Relvio Product Specification" document's product responsibility-area sequence (Dashboard → People → Events → Attendance → Messages → Workspace) is a product responsibility-area illustration only. It must not be interpreted as bottom-navigation order; this Primary Navigation section is the controlling navigation authority.
+
+---
+
 # Workspace
 
 The approved primary bottom navigation label is:
@@ -371,6 +406,18 @@ Workspace naming must remain consistent in:
 - Folder names
 - Providers
 - Tests
+
+---
+
+# Messages Navigation
+
+Messages is the fourth of the five frozen Relvio v1 primary bottom-navigation destinations (see "Primary Navigation" above: Home → People → Events → Messages → Workspace), evidenced by 17_Roadmap.md's completed Phase 1 "Approved Product Areas" list and Asset_Structure.md's Messages empty-state illustration provisioning. Frozen UI presence and production messaging backend readiness are separate concerns and must not be confused with each other.
+
+The production messaging backend (Conversation/Message persistence, participant identity, tenant/conversation-membership security, field-complete API contracts, pagination/sort, send/read semantics, notification side effects) remains explicitly deferred: 12_Database_Design.md lists Messages under "Future Tables — not required for MVP," and no approved documentation defines a field-complete, implementation-ready Messages/Conversations contract.
+
+Do not remove, rename, replace, or hide the Messages navigation destination merely because its production backend is deferred. Do not implement a production messaging backend, invent participant identity, invent real-time delivery, or invent notification side effects to fill this gap. Do not populate the Messages destination with fake or local-only conversation data merely to make the screen appear functional.
+
+The Messages route remains routable in Flutter v1 as a frozen-UI navigation destination that renders a neutral, explicit unavailable/not-yet-connected state until a future, separate authority decision promotes production messaging into approved MVP scope and resolves the gaps listed above. See 13_API_Specification.md and 15_Testing_Strategy.md for the corresponding pre-backend behavior contract.
 
 ---
 
