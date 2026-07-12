@@ -490,6 +490,24 @@ Credential-handling and security requirements for this fixture are governed by 1
 
 This document defines this fixture's authority boundary only. Implementing the fixture command is authorized as a separate implementation task.
 
+Local Person Fixture (Development/Test Support)
+
+Relvio approves one additional, separate development/test-support mechanism extending the controlled-fixture concept, used solely to enable live local verification of the People list/detail endpoints.
+
+This fixture is not product onboarding and does not implement or replace POST /organizations/{organizationId}/people.
+
+Scope: the fixture may create exactly one Person inside the existing controlled fixture Organization, with email null, phone null, avatarUrl null, status ACTIVE, and deletedAt null. It must create zero Tag, PersonTag, JourneyTemplate, JourneyStage, PersonJourneyHistory, Attendance, FollowUp, Note, Report, Notification, AuditLog, or auth-token record.
+
+Input: the fixture reads the required PERSON_FIXTURE_FIRST_NAME and PERSON_FIXTURE_LAST_NAME environment variables (trimmed, must be non-empty, no default). It reuses the existing AUTH_FIXTURE_EMAIL and AUTH_FIXTURE_ORGANIZATION_NAME only to locate the already-existing controlled fixture User, membership, and Organization.
+
+Idempotency: the fixture is idempotent on (controlled fixture Organization, normalized firstName, normalized lastName, null email, null phone). An existing exact, non-deleted match must not be mutated; no upsert-that-updates is approved. A matching but soft-deleted Person, or multiple exact matches, fail clearly rather than being repaired or guessed.
+
+Execution boundary: the fixture must refuse to run when NODE_ENV=production. It is manual invocation only and must never auto-run during application bootstrap, npm install, Prisma generate, Prisma migrate, tests, or build. No Prisma seed hook is approved for this mechanism.
+
+Credential-handling and security requirements for this fixture are governed by 16_Security.md.
+
+This document defines this fixture's authority boundary only. Implementing the fixture command is authorized as a separate implementation task.
+
 Database Deployment
 
 PostgreSQL is the approved primary relational database.

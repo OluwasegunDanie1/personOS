@@ -293,12 +293,17 @@ ORGANIZATION_ACCESS_DENIED
 
 Used for a malformed organizationId, a non-existent organization, a missing membership for the authenticated user, or a membership that cannot resolve its role consistently. This code must never reveal whether another tenant's organization exists.
 
+Stable v1 codes for the People domain:
+
+PERSON_NOT_FOUND
+JOURNEY_STAGE_NOT_FOUND
+
+PERSON_NOT_FOUND is used for an absent, deleted, or cross-tenant Person on any personId route, without disclosing cross-tenant existence. JOURNEY_STAGE_NOT_FOUND is used when a supplied journeyStageId does not belong to the validated organization. Relvio v1 does not define PERSON_DUPLICATE, EMAIL_ALREADY_EXISTS, PHONE_ALREADY_EXISTS, or PERSON_ALREADY_DELETED; Person.email and Person.phone are not unique and duplicates are allowed.
+
 Example error codes for other areas:
 
 AUTH_SESSION_EXPIRED
 PERMISSION_DENIED
-PERSON_NOT_FOUND
-PERSON_EMAIL_EXISTS
 EVENT_NOT_FOUND
 ATTENDANCE_ALREADY_RECORDED
 INVITATION_INVALID
@@ -397,30 +402,177 @@ Updates the role on the user's membership for this organization only.
 Remove Member
 DELETE /organizations/{organizationId}/members/{userId}
 People Endpoints
+
+People are organization-owned resources. All five People endpoints below require the global access-token guard, OrganizationMembershipGuard membership validation, and a validated request.organization context. There is no Community filter in Relvio v1; the previously undefined "Community filters" wording is removed.
+
+For any route containing personId, service-level Person access must scope by both id = personId and organizationId = validated organizationId. A personId-only lookup is prohibited. Cross-tenant Person access and an absent/non-visible Person both return the same stable error, PERSON_NOT_FOUND, without disclosing cross-tenant existence.
+
+Person Status
+
+The closed v1 accepted API values for Person.status are exactly:
+
+ACTIVE
+INACTIVE
+
+The underlying database column remains a plain string; this is an API-level allowlist, not a schema enum. Default status on creation is ACTIVE.
+
 List People
 GET /organizations/{organizationId}/people
 
-Supports:
+Approved query parameters: cursor, limit, search, journeyStageId, status, sort.
 
-Search
-Journey stage filters
-Community filters
-Sorting
-Pagination
+limit: default 20, minimum 1, maximum 100.
 
-Example:
+sort: one of name_asc (default), name_desc, newest, oldest.
 
-GET /organizations/{organizationId}/people?search=john&journey_stage=visitor
+name_asc: firstName ascending, lastName ascending, id ascending.
+name_desc: firstName descending, lastName descending, id ascending.
+newest: createdAt descending, id ascending.
+oldest: createdAt ascending, id ascending.
+
+Cursor pagination is opaque to the client; its internal encoding is an implementation detail, not part of this API contract.
+
+Only non-deleted Persons are returned (deletedAt IS NULL).
+
+search: trimmed; an empty trimmed value behaves as no search; case-insensitive; matches firstName, lastName, email, or phone (OR semantics).
+
+journeyStageId: returns Persons whose current journey stage matches. For v1, current journey stage is the most recent PersonJourneyHistory record by changedAt descending, then id descending; a Person with no journey history does not match any journeyStageId. The supplied journeyStageId must belong to the validated organization; if it does not exist there, return JOURNEY_STAGE_NOT_FOUND.
+
+status: ACTIVE or INACTIVE only.
+
+Invalid status, sort, limit, or other query values use the existing standard validation error handling.
+
+Success response data:
+
+{
+  "people": [
+    {
+      "id": "string",
+      "firstName": "string",
+      "lastName": "string",
+      "email": "string | null",
+      "phone": "string | null",
+      "status": "ACTIVE | INACTIVE",
+      "avatarUrl": "string | null",
+      "joinedAt": "string"
+    }
+  ],
+  "nextCursor": "string | null"
+}
+
+joinedAt maps to Person.createdAt. The list response does not include tags, current journey stage, attendance summary, follow-up summary, notes, or membership information.
+
+Empty state (HTTP 200, standard success envelope):
+
+{
+  "people": [],
+  "nextCursor": null
+}
+
 Create Person
 POST /organizations/{organizationId}/people
+
+Request fields (no others accepted):
+
+{
+  "firstName": "string",
+  "lastName": "string",
+  "email": "string | null (optional)",
+  "phone": "string | null (optional)",
+  "status": "ACTIVE | INACTIVE (optional)"
+}
+
+Required: firstName, lastName.
+
+Normalization: firstName and lastName are trimmed; email is trimmed and lowercased; phone is trimmed; an empty normalized optional email or phone becomes null.
+
+Validation: firstName and lastName must remain non-empty after trim; email, when non-null, must be syntactically valid; status, when supplied, must be ACTIVE or INACTIVE. Default status is ACTIVE.
+
+Relvio v1 imposes no database uniqueness on Person.email or Person.phone. Creation is never rejected merely because another Person in the organization shares the same email or phone. No duplicate detection or merge behavior is implemented.
+
+Creation does not assign tags, assign a journey stage, or create journey history, attendance, a follow-up, or a note.
+
+Success response data (HTTP 201, standard success envelope):
+
+{
+  "person": {
+    "id": "string",
+    "firstName": "string",
+    "lastName": "string",
+    "email": "string | null",
+    "phone": "string | null",
+    "status": "ACTIVE | INACTIVE",
+    "avatarUrl": "string | null",
+    "joinedAt": "string"
+  }
+}
+
 View Person
 GET /organizations/{organizationId}/people/{personId}
+
+Success response data:
+
+{
+  "person": {
+    "id": "string",
+    "firstName": "string",
+    "lastName": "string",
+    "email": "string | null",
+    "phone": "string | null",
+    "status": "ACTIVE | INACTIVE",
+    "avatarUrl": "string | null",
+    "joinedAt": "string",
+    "tags": [
+      { "id": "string", "name": "string" }
+    ],
+    "currentJourneyStage": { "id": "string", "name": "string" } | null
+  }
+}
+
+Tags must belong to the same organization through the Person's PersonTag relations, ordered name ascending then id ascending. currentJourneyStage uses the same latest-history rule as the journeyStageId filter above. Journey history, attendance history/summary, follow-ups, and notes are not embedded here; those remain separate product concerns/endpoints (see Person Timeline and Person Journey below). A deleted Person behaves as PERSON_NOT_FOUND.
+
 Update Person
 PATCH /organizations/{organizationId}/people/{personId}
+
+Mutable fields (no others accepted):
+
+{
+  "firstName": "string (optional)",
+  "lastName": "string (optional)",
+  "email": "string | null (optional)",
+  "phone": "string | null (optional)",
+  "status": "ACTIVE | INACTIVE (optional)"
+}
+
+Immutable through this endpoint: id, organizationId, avatarUrl, createdAt, updatedAt, deletedAt, tags, journey state/history, attendance, follow-ups, notes.
+
+Partial-update semantics: at least one approved mutable field must be supplied. Normalization and validation match Create Person. An explicit null for email or phone clears it; an empty normalized value also becomes null. firstName and lastName cannot be null or empty after trim. Duplicate email/phone remain allowed.
+
+Success response data matches Create Person's shape. A deleted or cross-tenant Person returns PERSON_NOT_FOUND.
+
 Delete Person
 DELETE /organizations/{organizationId}/people/{personId}
 
-Deletion must follow the approved soft-delete strategy where applicable.
+Person deletion is a soft deletion: deletedAt is set when the visible, organization-scoped Person exists. The Person row is never hard-deleted. PersonJourneyHistory, Attendance, FollowUp, Note, and PersonTag are never deleted or rewritten by this operation; historical/dependent records remain preserved.
+
+First successful deletion returns (standard success envelope):
+
+{
+  "success": true
+}
+
+A repeated delete sees the Person as non-visible and returns PERSON_NOT_FOUND, as does a cross-tenant Person. No restore behavior is defined.
+
+Tag and Journey Boundary for People CRUD
+
+Tags are read-only through Person detail for this People CRUD slice; Tag CRUD endpoints are not defined here, and Create/Update Person never assign or mutate tags. People list may filter by current journey stage and Person detail may expose currentJourneyStage, but Create/Update Person never change journey stage; journey-stage movement remains governed by the separate Person Journey endpoint below, not by PATCH Person.
+
+Person-Domain Error Codes
+
+PERSON_NOT_FOUND: an absent, deleted, or cross-tenant Person for any personId route.
+JOURNEY_STAGE_NOT_FOUND: a journeyStageId query value that does not belong to the validated organization.
+
+Neither this document nor any Person endpoint defines PERSON_DUPLICATE, EMAIL_ALREADY_EXISTS, PHONE_ALREADY_EXISTS, or PERSON_ALREADY_DELETED; these are not approved v1 codes. All other validation failures continue through the existing global validation/error foundation.
 
 Person Timeline
 View Timeline

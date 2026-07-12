@@ -280,6 +280,18 @@ The fixture is idempotent; existing matching records must not be mutated (no ups
 
 This fixture is not product onboarding. It does not implement an organization-creation API and does not replace a future registration/onboarding contract.
 
+Development Person Fixture Security
+
+A third, separate development/test-support mechanism extends the same controlled-fixture concept to enable live local verification of the People list/detail endpoints. It may create exactly one Person inside the existing controlled fixture Organization, with email, phone, and avatarUrl null, status ACTIVE, and deletedAt null. It must create zero Tag, PersonTag, JourneyTemplate, JourneyStage, PersonJourneyHistory, Attendance, FollowUp, Note, Report, Notification, AuditLog, or auth-token record.
+
+This fixture reuses AUTH_FIXTURE_EMAIL and AUTH_FIXTURE_ORGANIZATION_NAME only to locate the existing controlled User, membership, and Organization; it reads the required, non-default PERSON_FIXTURE_FIRST_NAME and PERSON_FIXTURE_LAST_NAME environment variables (trimmed, non-empty).
+
+The fixture is idempotent on (controlled fixture Organization, normalized firstName, normalized lastName, null email, null phone); existing matching non-deleted records must not be mutated (no upsert-that-updates). A matching but soft-deleted Person, or multiple exact matches, fail clearly rather than being repaired or guessed. It must refuse to run when NODE_ENV=production, is invoked manually only, and must never auto-run during application bootstrap, npm install, Prisma generate, Prisma migrate, tests, or build. This fixture is not product onboarding and does not replace POST /people.
+
+Person Tenant Isolation
+
+For any personId route, service-level Person access must scope by both id = personId and organizationId = the validated organization context; a personId-only lookup is prohibited. Cross-tenant Person access and an absent or soft-deleted Person return the identical stable error, PERSON_NOT_FOUND, without disclosing whether a Person exists in another tenant's organization.
+
 Authorization
 
 Relvio uses role and permission-based authorization.

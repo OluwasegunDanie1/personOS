@@ -238,6 +238,8 @@ Fields:
 - created_at
 - updated_at
 
+status is stored as a plain string column. The closed v1 API allowlist for this value is ACTIVE or INACTIVE, defined by 13_API_Specification.md; this is an API-level constraint, not a Prisma enum change.
+
 ---
 
 ## Tags

@@ -457,6 +457,12 @@ A second, separate development-only command extends this fixture concept to enab
 
 This fixture is test/infrastructure support only. It is not product onboarding and does not implement an organization-creation API. Unit tests for the access-token guard and organization-membership boundary must remain possible with a mocked PrismaService and must not require this fixture or a live database; the fixture exists only to additionally support live verification, and must not run automatically as part of the automated test suite, build, or CI pipeline.
 
+Live Local Person Fixture
+
+A third, separate development-only command extends this fixture concept to enable live local verification of the People list/detail endpoints. It creates exactly one Person inside the existing controlled fixture Organization, using the required PERSON_FIXTURE_FIRST_NAME/PERSON_FIXTURE_LAST_NAME environment variables; it creates zero Tag, PersonTag, journey, attendance, follow-up, note, or other product-domain records. Its exact scope, input, idempotency, and execution-environment authority are governed by Deployment.md and 16_Security.md.
+
+Unit tests for People list/detail logic must remain possible with a mocked PrismaService and must not require this fixture or a live database; non-empty live People-list/detail verification is the only scenario that depends on it. This fixture must not run automatically as part of the automated test suite, build, or CI pipeline.
+
 Organization Testing
 
 Verify:
