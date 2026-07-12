@@ -306,6 +306,26 @@ JourneyTemplate is scoped directly by organizationId = the validated organizatio
 
 Journey history remains immutable: movedBy exposes only id, firstName, lastName (never email, phone, status, passwordHash, or deletedAt), and historical attribution remains visible unchanged even if that User later becomes DISABLED or is soft-deleted.
 
+Development Event Fixture Security
+
+A fifth, separate development/test-support mechanism extends the same controlled-fixture concept to enable live local verification of the Event and Attendance endpoints. It may create exactly one Event inside the existing controlled fixture Organization, with description, category, venue, and endDate null, and createdBy set to the existing controlled fixture User. It must create zero Attendance, EventCategory-shaped, EventTemplate-shaped, or any other product-domain record.
+
+This fixture reuses AUTH_FIXTURE_EMAIL and AUTH_FIXTURE_ORGANIZATION_NAME only to locate the existing controlled User, membership, and Organization; it reads the required, non-default EVENT_FIXTURE_TITLE and EVENT_FIXTURE_START_DATE environment variables (trimmed/parsed, non-empty). It never reads AUTH_FIXTURE_PASSWORD.
+
+The fixture is idempotent on (controlled fixture Organization, normalized title, exact startDate); an existing exact, non-deleted match must not be mutated (no upsert-that-updates). A matching but soft-deleted Event, or multiple exact matches, fail clearly rather than being repaired or guessed. It must refuse to run when NODE_ENV=production, is invoked manually only, and must never auto-run during application bootstrap, npm install, Prisma generate, Prisma migrate, tests, or build. It is test/development support only and does not implement or replace POST /organizations/{organizationId}/events or the Record Attendance endpoint.
+
+This fixture must never expand to a second Organization or a second controlled User. Live verification of cross-tenant Event/Attendance isolation is out of scope for this fixture and must remain a mocked/unit-level test concern (see 15_Testing_Strategy.md); the controlled fixture mechanism approved across all five fixtures exists for single-tenant, happy-path live verification only.
+
+Like every prior fixture, this mechanism's CLI runner output must be neutral: it may report only a success/already-exists result, never the AUTH_FIXTURE_EMAIL value, never any Event field value, and never any other secret or personal data.
+
+Event Tenant Isolation
+
+For any eventId route, service-level Event access must scope by id = eventId, organizationId = the validated organization context, and deletedAt IS NULL; an eventId-only lookup is prohibited. Cross-tenant Event access and an absent or soft-deleted Event return the identical stable error, EVENT_NOT_FOUND, without disclosing whether an Event exists in another tenant's organization.
+
+Attendance Tenant Isolation
+
+Attendance is scoped directly by organizationId, since the schema gives Attendance its own organizationId column; this direct column must always be included in Attendance queries in addition to any Event or Person relation. Before any Attendance row is read or written, Event tenant ownership (id + organizationId + deletedAt null) and Person tenant ownership (id + organizationId + deletedAt null) must each be validated independently — an Attendance row must never be reached only through an eventId or personId path parameter without first confirming both parents belong to the validated organization context. A cross-tenant or absent Event returns EVENT_NOT_FOUND; a cross-tenant or absent Person returns PERSON_NOT_FOUND; neither discloses foreign existence.
+
 Authorization
 
 Relvio uses role and permission-based authorization.
@@ -538,12 +558,11 @@ Example:
 
 If supported attendance statuses are:
 
-present
-absent
-excused
-visitor
+PRESENT
+ABSENT
+LATE
 
-the backend must reject unsupported values.
+the backend must reject unsupported values. These are the public API values; the internal Prisma persistence enum (Present, Absent, Late) is never exposed to clients (see 13_API_Specification.md for the explicit mapping).
 
 Frontend validation improves usability.
 
@@ -689,8 +708,7 @@ Sensitive write operations identified by the API Specification must support idem
 
 Examples:
 
-Attendance check-in
-Manual attendance submission
+Attendance recording
 Invitation acceptance
 Announcement sending
 Campaign sending
@@ -701,6 +719,8 @@ Idempotency keys must be scoped appropriately.
 A key used by one organization or operation must not incorrectly return data from another organization or operation.
 
 Idempotency storage must not expose another user's response.
+
+Record Attendance does not use a client-supplied Idempotency-Key header. Its natural key — the database-level unique constraint on (organizationId, eventId, personId) — is sufficient and approved for this endpoint; see Attendance Integrity below and 13_API_Specification.md.
 
 Attendance Integrity
 
@@ -725,6 +745,8 @@ Idempotency
 Database constraints
 
 Client-side duplicate prevention is not sufficient.
+
+Approved v1 idempotency mechanism: on Record Attendance, the backend attempts to create the Attendance row directly. If the database unique-constraint on (organizationId, eventId, personId) rejects the write because a matching row already exists — including under a concurrent race between two simultaneous first-creation requests — the backend must catch that constraint violation, re-fetch the existing row, and return it with HTTP 200. It must never surface the raw database constraint error to the client, and it must never update the existing row's status to match a differing replay request.
 
 Offline Attendance Security
 

@@ -548,6 +548,12 @@ A fourth, separate development-only command extends the controlled-fixture conce
 
 Unit tests for Journey Stage/movement logic must remain possible with a mocked PrismaService and must not require this fixture or a live database; non-empty live Journey verification is the only scenario that depends on it. This fixture must not run automatically as part of the automated test suite, build, or CI pipeline.
 
+Live Local Event Fixture
+
+A fifth, separate development-only command extends the controlled-fixture concept to enable live local verification of the Event and Attendance endpoints. It creates exactly one Event (description, category, venue, and endDate null) inside the existing controlled fixture Organization, using the required EVENT_FIXTURE_TITLE/EVENT_FIXTURE_START_DATE environment variables; it creates zero Attendance records. Its exact scope, input, idempotency, and execution-environment authority are governed by Deployment.md and 16_Security.md.
+
+Unit tests for Event and Attendance logic must remain possible with a mocked PrismaService and must not require this fixture or a live database; non-empty live Event/Attendance verification is the only scenario that depends on it. This fixture must not run automatically as part of the automated test suite, build, or CI pipeline. It must never be expanded to a second Organization: cross-tenant Event/Attendance isolation (see Organization Isolation Testing) must be verified with mocked/unit-level tests only.
+
 Community Testing
 
 Verify:
@@ -565,69 +571,58 @@ Verify organization isolation for all community membership operations.
 
 Event Testing
 
+Relvio v1 approves exactly five Event endpoints: List Events, Create Event, View Event, Update Event, and Delete Event. There is no Cancel Event endpoint, no event status filter, and no Event Categories or Event Templates CRUD — none had schema backing.
+
 Verify:
 
-List events
-Search
-Status filters
-Category filters
-Date filters
-Create event
+List events with exactly the approved query params: cursor, limit, search, category, sort (no date-range query filter exists in v1)
+Search matches title, description, and venue (case-insensitive contains, OR semantics; empty search behaves as absent)
+Category filter (plain string, case-insensitive exact match)
+Sort allowlist exactly startDate_desc (default), startDate_asc, createdAt_desc, title_asc, each tie-broken by id ascending
+Create event, including the ISO 8601 absolute-instant validation (offset/Z required) for startDate/endDate
 View event
-Update event
-Delete event
-Cancel event
-Event categories
-Event templates
+Update event, including final-combined-value date validation when only one of startDate/endDate is supplied
+Delete event (soft deletion)
+Cross-tenant Event access returns EVENT_NOT_FOUND
 
 Date and time testing must include:
 
-Start before end
+Start before end (INVALID_EVENT_DATE_RANGE on Create and Update)
+Offset-less/date-only startDate or endDate rejected as a validation error
 Time zone handling
 Date boundary behaviour
-Invalid date ranges
 
-Cancelling an event must preserve the event record.
+Deleting an event is the sole approved v1 lifecycle-ending action and must preserve the Event record via soft deletion (deletedAt); no separate cancellation state exists.
 
 Attendance Testing
 
-Attendance is a critical Relvio workflow.
+Attendance is a critical Relvio workflow. Relvio v1 approves exactly three Attendance endpoints: Event Attendance (list), Record Attendance, and Person Attendance (history). There is no separate check-in-method endpoint, walk-in-visitor endpoint, batch manual-attendance endpoint, or attendance summary endpoint in v1.
+
+The Prisma persistence enum remains exactly Present, Absent, Late (schema-frozen). The public v1 API status value set is a distinct, exact mapping: PRESENT -> Present, ABSENT -> Absent, LATE -> Late (and the reverse on read). excused and visitor are not approved in either casing and must be rejected as validation errors. Tests must assert the public casing (PRESENT/ABSENT/LATE) at the HTTP boundary and must never assert that internal Prisma casing is returned to a client.
 
 Verify:
 
-Event attendance list
-Search-based check-in
-Manual check-in
-QR check-in
-Walk-in visitor
-Manual attendance submission
-Present status
-Absent status
-Excused status
-Visitor status
-Person attendance history
-Attendance summary
-Attendance calculations
+Event Attendance list with exactly cursor, limit (default 50), status (PRESENT/ABSENT/LATE), sort (checkedInAt_desc default, checkedInAt_asc, personName_asc), each tie-broken by id ascending
+Record Attendance: personId required, status optional defaulting to PRESENT, only PRESENT/ABSENT/LATE accepted
+Person Attendance history with exactly cursor, limit (default 50), sort (checkedInAt_desc default, checkedInAt_asc, eventStartDate_desc) — no status filter on this endpoint
+Attendance record is immutable: no Update Attendance, Delete Attendance, or correction/reversal endpoint exists
+Attendance rows for a since-soft-deleted Person remain visible in Event Attendance list; rows for a since-soft-deleted Event remain visible in Person Attendance history
+Updating an Event's startDate/endDate never rewrites an existing Attendance.checkedInAt
 
 Critical tests:
 
-Duplicate attendance prevention
-Database uniqueness enforcement
-Idempotency retry
-Concurrent duplicate requests
-Incorrect organization
-Incorrect event
+Duplicate attendance prevention via the database-level unique constraint on (organizationId, eventId, personId)
+Idempotent replay: a repeat Record Attendance request for the same (organizationId, eventId, personId) returns the existing row unchanged with HTTP 200, not a new row and not an error — and the replay's submitted status (even an explicit non-default value) must be ignored, never mutating the stored row
+Concurrent duplicate requests: both must resolve to the same single stored row (one HTTP 201, the other HTTP 200), verified via a caught unique-constraint conflict followed by re-fetch, with no upsert-that-updates
+Attendance may be recorded against a past-dated or future-dated Event without restriction
+Incorrect/cross-tenant organization returns ORGANIZATION_ACCESS_DENIED
+Incorrect/cross-tenant event returns EVENT_NOT_FOUND
+Incorrect/cross-tenant person returns PERSON_NOT_FOUND
 Permission denial
 
-Example:
+Record Attendance does not use an Idempotency-Key header; the (organizationId, eventId, personId) uniqueness constraint is the approved idempotency mechanism (see 16_Security.md). Do not write tests asserting an Idempotency-Key header is required or honored for this endpoint.
 
-Request 1:
-Idempotency-Key: abc123
-
-Request 2:
-Idempotency-Key: abc123
-
-The requests must not create two attendance records.
+Cross-tenant Attendance isolation must be verified with mocked/unit-level tests; the controlled Event fixture (see Live Local Event Fixture) is single-Organization only and must not be used for live cross-tenant verification.
 
 Offline Attendance Testing
 

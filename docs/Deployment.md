@@ -526,6 +526,28 @@ Credential-handling and security requirements for this fixture are governed by 1
 
 This document defines this fixture's authority boundary only. Implementing the fixture command is authorized as a separate implementation task.
 
+Local Event Fixture (Development/Test Support)
+
+Relvio approves one additional, separate development/test-support mechanism extending the controlled-fixture concept, used solely to enable live local verification of the Event and Attendance endpoints.
+
+This fixture is not user-facing Event management and does not implement or replace POST /organizations/{organizationId}/events or the Record Attendance endpoint.
+
+Scope: the fixture may create exactly one Event inside the existing controlled fixture Organization, with description, category, venue, and endDate null, and createdBy set to the existing controlled fixture User. It must create zero Attendance records and zero records of any other product-domain model.
+
+Input: the fixture reads the required EVENT_FIXTURE_TITLE and EVENT_FIXTURE_START_DATE environment variables (trimmed/parsed, must be non-empty, no default). It reuses the existing AUTH_FIXTURE_EMAIL and AUTH_FIXTURE_ORGANIZATION_NAME only to locate the already-existing controlled fixture User, membership, and Organization; it never reads AUTH_FIXTURE_PASSWORD.
+
+Idempotency: the fixture is idempotent on (controlled fixture Organization, normalized title, exact startDate). An existing exact, non-deleted match must not be mutated; no upsert-that-updates is approved. A matching but soft-deleted Event, or multiple exact matches, fail clearly rather than being repaired or guessed.
+
+Execution boundary: the fixture must refuse to run when NODE_ENV=production. It is manual invocation only and must never auto-run during application bootstrap, npm install, Prisma generate, Prisma migrate, tests, or build. No Prisma seed hook is approved for this mechanism.
+
+This fixture must never be expanded to create a second Organization or a second controlled User for cross-tenant live testing; cross-tenant Event/Attendance isolation remains a mocked/unit-level test concern under 15_Testing_Strategy.md.
+
+CLI output: the runner must print only a neutral success/already-exists result, never AUTH_FIXTURE_EMAIL, never any Event field value, and never any other secret or personal data.
+
+Credential-handling and security requirements for this fixture are governed by 16_Security.md.
+
+This document defines this fixture's authority boundary only. Implementing the fixture command is authorized as a separate implementation task.
+
 Database Deployment
 
 PostgreSQL is the approved primary relational database.

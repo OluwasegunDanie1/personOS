@@ -731,122 +731,246 @@ PATCH /organizations/{organizationId}/follow-ups/{followUpId}/complete
 Completing a follow-up may create a timeline activity.
 
 Event Endpoints
+
+Events are organization-owned resources. All five Event endpoints below require the global access-token guard, OrganizationMembershipGuard membership validation, and a validated request.organization context.
+
+The approved Event schema has no status, cancelledAt, or lifecycle-state column, no EventCategory model, and no EventTemplate model. category is a single plain nullable string column directly on Event, not a separate manageable resource. Event Categories and Event Templates as listable/creatable/updatable/deletable resources are not approved v1 endpoints; they referenced schema models that do not exist and have been removed from this contract. There is no Cancel Event endpoint and no event status filter: Delete Event (below) is the sole approved v1 lifecycle-ending action, and it already preserves the event record through soft deletion.
+
+For any route containing eventId, service-level Event access must scope by both id = eventId and organizationId = validated organizationId, with deletedAt IS NULL. An absent, deleted, or cross-tenant Event returns the stable error EVENT_NOT_FOUND, without disclosing cross-tenant existence.
+
 List Events
 GET /organizations/{organizationId}/events
 
-Supports:
+Approved query parameters (exactly these, no others): cursor, limit, search, category, sort. There is no date-range query filter in v1.
 
-Search
-Status
-Category
-Date range
-Sorting
-Pagination
+limit: default 20, minimum 1, maximum 100.
+
+sort: exactly one of startDate_desc (default), startDate_asc, createdAt_desc, title_asc.
+
+startDate_desc: startDate descending, id ascending.
+startDate_asc: startDate ascending, id ascending.
+createdAt_desc: createdAt descending, id ascending.
+title_asc: title ascending, id ascending.
+
+Every sort ends with id ascending as the deterministic tie-break. Cursor pagination is opaque to the client and is bound to the active sort; its internal encoding is an implementation detail, not part of this API contract.
+
+Only non-deleted Events are returned (deletedAt IS NULL).
+
+search: trimmed; an empty trimmed value behaves as no search (absent); case-insensitive contains (substring) match; matches title, description, or venue (OR semantics).
+
+category: trimmed, case-insensitive exact match against Event.category; an Event with category null never matches a supplied category filter.
+
+Invalid sort, limit, or other query values use the existing standard validation error handling.
+
+Success response data:
+
+{
+  "events": [
+    {
+      "id": "string",
+      "title": "string",
+      "description": "string | null",
+      "category": "string | null",
+      "venue": "string | null",
+      "startDate": "string",
+      "endDate": "string | null",
+      "createdAt": "string"
+    }
+  ],
+  "nextCursor": "string | null"
+}
+
+Empty state (HTTP 200, standard success envelope): { "events": [], "nextCursor": null }.
+
 Create Event
 POST /organizations/{organizationId}/events
+
+Request fields (no others accepted):
+
+{
+  "title": "string",
+  "description": "string | null (optional)",
+  "category": "string | null (optional)",
+  "venue": "string | null (optional)",
+  "startDate": "string",
+  "endDate": "string | null (optional)"
+}
+
+Required: title, startDate.
+
+Normalization: title, description, category, and venue are trimmed; an empty normalized optional value becomes null.
+
+Validation: title must remain non-empty after trim; startDate must be an ISO 8601 datetime string representing an absolute instant (an explicit UTC offset or Z suffix is required; a date-only value or an offset-less local datetime is rejected as a standard validation error); endDate, when supplied and non-null, follows the same absolute-instant rule and must not be earlier than startDate, else INVALID_EVENT_DATE_RANGE.
+
+createdBy is always request.auth.userId; it is never client-supplied. organizationId is always path-derived. Creation never creates an Attendance record.
+
+Success response data (HTTP 201, standard success envelope):
+
+{
+  "event": {
+    "id": "string",
+    "title": "string",
+    "description": "string | null",
+    "category": "string | null",
+    "venue": "string | null",
+    "startDate": "string",
+    "endDate": "string | null",
+    "createdAt": "string",
+    "createdBy": { "id": "string", "firstName": "string", "lastName": "string" }
+  }
+}
+
 View Event
 GET /organizations/{organizationId}/events/{eventId}
+
+Success response data matches Create Event's shape. createdBy exposes only id, firstName, lastName — never email, phone, status, passwordHash, or deletedAt; historical attribution remains visible unchanged even if that User later becomes DISABLED or is soft-deleted. A deleted or cross-tenant Event returns EVENT_NOT_FOUND.
+
 Update Event
 PATCH /organizations/{organizationId}/events/{eventId}
+
+Mutable fields (no others accepted): title, description, category, venue, startDate, endDate — all optional, same normalization and validation as Create Event. Partial-update semantics: at least one approved mutable field must be supplied. An explicit null for description, category, venue, or endDate clears it; an empty normalized value also becomes null. title and startDate cannot be null or empty after trim. Date-range validation always uses the final combined values that would actually be persisted — the supplied field's new value merged with the other field's existing stored value when only one of startDate/endDate is supplied in the request — and rejects with INVALID_EVENT_DATE_RANGE when the resulting effective endDate would be earlier than the resulting effective startDate.
+
+Immutable through this endpoint: id, organizationId, createdBy, createdAt, updatedAt, deletedAt.
+
+Success response data matches Create Event's shape. A deleted or cross-tenant Event returns EVENT_NOT_FOUND.
+
 Delete Event
 DELETE /organizations/{organizationId}/events/{eventId}
-Cancel Event
-PATCH /organizations/{organizationId}/events/{eventId}/cancel
 
-Cancellation must preserve the event record.
+Event deletion is a soft deletion: deletedAt is set when the visible, organization-scoped Event exists. The Event row is never hard-deleted. Attendance records referencing this eventId are never deleted or rewritten by this operation; historical attendance remains preserved. This is the approved v1 equivalent of "cancelling" an event; there is no separate cancel action or status transition.
 
-Event Categories
-List Categories
-GET /organizations/{organizationId}/event-categories
-Create Category
-POST /organizations/{organizationId}/event-categories
-Update Category
-PATCH /organizations/{organizationId}/event-categories/{categoryId}
-Delete Category
-DELETE /organizations/{organizationId}/event-categories/{categoryId}
-Event Templates
-List Templates
-GET /organizations/{organizationId}/event-templates
-Create Template
-POST /organizations/{organizationId}/event-templates
-Update Template
-PATCH /organizations/{organizationId}/event-templates/{templateId}
-Delete Template
-DELETE /organizations/{organizationId}/event-templates/{templateId}
+First successful deletion returns (standard success envelope): { "success": true }.
+
+A repeated delete sees the Event as non-visible and returns EVENT_NOT_FOUND, as does a cross-tenant Event.
+
+Event-Domain Error Codes
+
+EVENT_NOT_FOUND: an absent, deleted, or cross-tenant Event for any eventId route.
+INVALID_EVENT_DATE_RANGE: a supplied endDate earlier than the applicable startDate.
+
+Neither this document nor any Event endpoint defines EVENT_CATEGORY_NOT_FOUND, EVENT_TEMPLATE_NOT_FOUND, or an event status/cancellation code; these are not approved v1 codes.
+
 Attendance Endpoints
+
+Attendance write behavior in Relvio v1 is narrowed to exactly three endpoints. There is no check-in-method endpoint variant (manual/search/walk-in/offline_sync), no walk-in-visitor endpoint that creates or links a Person, no batch/multi-entry manual attendance endpoint, and no attendance summary endpoint; none of these had schema or product backing beyond illustrative wording, and they are removed from this contract.
+
+Attendance Status
+
+The Prisma persistence enum (AttendanceStatus) remains exactly Present, Absent, Late — unchanged, schema-frozen. The public v1 API status values are a separate, distinct closed set, exactly:
+
+PRESENT
+ABSENT
+LATE
+
+The API must never expose internal Prisma enum casing. Every request and response boundary translates explicitly between the two using this exact mapping:
+
+PRESENT -> Present
+ABSENT -> Absent
+LATE -> Late
+
+and the corresponding reverse mapping (Present -> PRESENT, Absent -> ABSENT, Late -> LATE) when reading a stored row back out. excused and visitor remain unapproved in either casing and are rejected as validation errors.
+
+For any route containing eventId or personId, service-level access must independently scope Event by id + organizationId + deletedAt null (EVENT_NOT_FOUND otherwise) and Person by id + organizationId + deletedAt null (PERSON_NOT_FOUND otherwise), mirroring the Journey movement dual-validation pattern. Attendance itself is scoped directly by organizationId, since the schema gives Attendance a direct organizationId column. Event.startDate may be in the past or the future; attendance may be recorded for either without restriction.
+
 Event Attendance
 GET /organizations/{organizationId}/events/{eventId}/attendance
-Record Check-In
-POST /organizations/{organizationId}/events/{eventId}/attendance/check-in
 
-Example:
+Approved query parameters (exactly these): cursor, limit, status, sort.
 
-{
-  "person_id": "person_id",
-  "check_in_method": "manual",
-  "checked_in_at": "2026-07-10T09:30:00Z"
-}
+limit: default 50, minimum 1, maximum 100. status: optional filter, one of the public values PRESENT, ABSENT, LATE.
 
-Supported check-in methods may include:
+sort: exactly one of checkedInAt_desc (default), checkedInAt_asc, personName_asc.
 
-manual
-search
-walk_in
-offline_sync
-Record Walk-In Visitor
-POST /organizations/{organizationId}/events/{eventId}/attendance/walk-ins
+checkedInAt_desc: checkedInAt descending, id ascending.
+checkedInAt_asc: checkedInAt ascending, id ascending.
+personName_asc: person firstName ascending, person lastName ascending, id ascending.
 
-Creates or links a person and records attendance.
-
-Manual Attendance
-POST /organizations/{organizationId}/events/{eventId}/attendance/manual
-
-Supports recording multiple attendance entries.
-
-Example:
+Success response data:
 
 {
-  "entries": [
+  "attendance": [
     {
-      "person_id": "person_id",
-      "status": "present"
-    },
-    {
-      "person_id": "person_id",
-      "status": "absent"
+      "id": "string",
+      "person": { "id": "string", "firstName": "string", "lastName": "string" },
+      "status": "PRESENT | ABSENT | LATE",
+      "checkedInBy": { "id": "string", "firstName": "string", "lastName": "string" } | null,
+      "checkedInAt": "string"
     }
-  ]
+  ],
+  "nextCursor": "string | null"
 }
 
-Attendance statuses:
+Empty state (HTTP 200): { "attendance": [], "nextCursor": null }.
 
-present
-absent
-excused
-visitor
+A row remains visible in this list even after its referenced Person is later soft-deleted; Person.deletedAt never hides or removes historical Attendance, and the person sub-object continues to render from the Person's stored name fields.
+
+Record Attendance
+POST /organizations/{organizationId}/events/{eventId}/attendance
+
+Request fields (no others accepted):
+
+{ "personId": "string", "status": "PRESENT | ABSENT | LATE (optional, default PRESENT)" }
+
+personId is required. status is optional and defaults to PRESENT when omitted; only the public values PRESENT, ABSENT, LATE are accepted (standard validation error otherwise). checkedInBy is always request.auth.userId; checkedInAt is always the server clock at write time; neither is client-supplied. eventId and organizationId are always path-derived.
+
+Event is validated (id + organizationId + deletedAt null, else EVENT_NOT_FOUND) and Person is validated (id + organizationId + deletedAt null, else PERSON_NOT_FOUND) before any write. Event.startDate being in the past or the future does not affect whether attendance can be recorded.
+
+Idempotency: the database-level unique constraint on (organizationId, eventId, personId) is the sole idempotency key; no Idempotency-Key header is required or read. If no Attendance row exists yet for this (organizationId, eventId, personId), one is created and returned with HTTP 201. If a matching row already exists, it is returned unchanged with HTTP 200: the request is not rejected, no duplicate is created, and the duplicate request's submitted status (including any explicit non-default value) is entirely ignored — it never updates the existing row's status, checkedInBy, or checkedInAt. No upsert-that-updates is approved; a duplicate request must never issue a write capable of modifying an existing row, and it produces no other side effects. Under a concurrent race (two requests attempting first-creation simultaneously), the backend must catch the resulting database unique-constraint violation and re-fetch and return the now-existing row with HTTP 200 rather than surfacing a 409 or 500.
+
+Success response data (HTTP 201 on first creation, HTTP 200 on idempotent replay):
+
+{
+  "attendance": {
+    "id": "string",
+    "person": { "id": "string", "firstName": "string", "lastName": "string" },
+    "status": "PRESENT | ABSENT | LATE",
+    "checkedInBy": { "id": "string", "firstName": "string", "lastName": "string" } | null,
+    "checkedInAt": "string"
+  }
+}
+
 Person Attendance
 GET /organizations/{organizationId}/people/{personId}/attendance
-Attendance Summary
-GET /organizations/{organizationId}/events/{eventId}/attendance/summary
 
-Returns:
+Approved query parameters (exactly these, no status filter): cursor, limit, sort.
 
-Expected attendance
-Checked in
-Remaining
-Visitors
-Attendance rate
-Attendance Idempotency
+limit: default 50, minimum 1, maximum 100.
 
-Attendance write endpoints must support idempotency.
+sort: exactly one of checkedInAt_desc (default), checkedInAt_asc, eventStartDate_desc.
 
-Example header:
+checkedInAt_desc: checkedInAt descending, id ascending.
+checkedInAt_asc: checkedInAt ascending, id ascending.
+eventStartDate_desc: event startDate descending, id ascending.
 
-Idempotency-Key: <unique-key>
+Success response data:
 
-Repeated requests using the same idempotency key must not create duplicate attendance records.
+{
+  "attendance": [
+    {
+      "id": "string",
+      "event": { "id": "string", "title": "string", "startDate": "string" },
+      "status": "PRESENT | ABSENT | LATE",
+      "checkedInAt": "string"
+    }
+  ],
+  "nextCursor": "string | null"
+}
 
-The backend must also enforce attendance uniqueness using a database-level constraint on (organization_id, event_id, person_id), matching the approved Database Design.
+Empty state (HTTP 200): { "attendance": [], "nextCursor": null }.
+
+A row remains visible in this history even after its referenced Event is later soft-deleted; Event.deletedAt never hides or removes historical Attendance for a Person.
+
+Attendance Lifecycle and Immutability
+
+Attendance records are immutable once created: there is no Update Attendance, Delete Attendance, or any reversal/correction endpoint in v1. A recorded status can only be established at creation time; correcting a mistaken check-in requires a separately approved future capability, not a v1 endpoint. This mirrors the append-only immutability already approved for PersonJourneyHistory.
+
+Editing an Event's startDate or endDate through Update Event never rewrites, recalculates, or otherwise touches any existing Attendance.checkedInAt value. Soft-deleting an Event or a Person never deletes, hard-removes, or rewrites existing Attendance rows; the historical-visibility rules above govern how those rows continue to display.
+
+Attendance-Domain Error Codes
+
+Attendance endpoints reuse EVENT_NOT_FOUND and PERSON_NOT_FOUND (defined above); no new Attendance-specific error code is introduced. Idempotent replay is a success response, not an error, and must never use a 409 or 422 status.
+
+The backend must enforce attendance uniqueness using the database-level constraint on (organization_id, event_id, person_id), matching the approved Database Design; this constraint is what makes the idempotency behavior above correct even under concurrent requests. This constraint governs the internal Present/Absent/Late enum column; it is unaffected by the public PRESENT/ABSENT/LATE API mapping defined above.
 
 Communities
 List Communities
@@ -1129,7 +1253,6 @@ Examples:
 
 GET /organizations/{organizationId}/people?journey_stage=visitor
 GET /organizations/{organizationId}/events?category=conference
-GET /organizations/{organizationId}/events?status=upcoming
 GET /organizations/{organizationId}/follow-ups?status=pending
 
 Filters must use documented field names.
@@ -1205,8 +1328,6 @@ Sensitive write operations must support idempotency where duplicate requests cou
 
 Required for:
 
-Attendance check-in
-Manual attendance submission
 Invitation acceptance
 Announcement sending
 Campaign sending
@@ -1217,6 +1338,8 @@ Header:
 Idempotency-Key: <unique-key>
 
 The backend must return the original result when the same key is safely retried.
+
+Record Attendance is idempotent but does not use this header; its idempotency key is the database-level unique constraint on (organizationId, eventId, personId). See Attendance Endpoints above.
 
 Rate Limiting
 
