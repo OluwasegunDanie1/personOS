@@ -532,6 +532,22 @@ Verify that previous journey history remains unchanged.
 
 Journey history must never be silently overwritten.
 
+Verify additionally:
+
+Reorder rejects a missing, extra, duplicate, or foreign stage with INVALID_STAGE_ORDER, without disclosing whether a foreign stage exists.
+Delete rejects a stage referenced by PersonJourneyHistory with JOURNEY_STAGE_IN_USE, and succeeds (hard delete) only when unreferenced.
+Current journey stage uses the latest PersonJourneyHistory row ordered movedAt descending, then id descending.
+Movement to a Person's current stage is rejected with PERSON_ALREADY_IN_STAGE.
+Backward movement and skipped-stage movement are both allowed; v1 has no transition graph.
+Cross-tenant Person and cross-tenant/foreign Stage are both denied (PERSON_NOT_FOUND, JOURNEY_STAGE_NOT_FOUND respectively) without disclosing existence.
+movedBy and movedAt are always server-derived from the authenticated user and server clock, never client input.
+
+Live Local Journey Fixture
+
+A fourth, separate development-only command extends the controlled-fixture concept to enable live local verification of the Journey Stage and Person Journey endpoints. It creates exactly one JourneyTemplate and exactly two JourneyStages (positions 1 and 2) inside the existing controlled fixture Organization, using the required JOURNEY_FIXTURE_TEMPLATE_NAME/JOURNEY_FIXTURE_STAGE_ONE_NAME/JOURNEY_FIXTURE_STAGE_TWO_NAME environment variables; it creates zero PersonJourneyHistory. Its exact scope, input, idempotency, and execution-environment authority are governed by Deployment.md and 16_Security.md.
+
+Unit tests for Journey Stage/movement logic must remain possible with a mocked PrismaService and must not require this fixture or a live database; non-empty live Journey verification is the only scenario that depends on it. This fixture must not run automatically as part of the automated test suite, build, or CI pipeline.
+
 Community Testing
 
 Verify:

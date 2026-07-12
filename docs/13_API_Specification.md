@@ -298,7 +298,15 @@ Stable v1 codes for the People domain:
 PERSON_NOT_FOUND
 JOURNEY_STAGE_NOT_FOUND
 
-PERSON_NOT_FOUND is used for an absent, deleted, or cross-tenant Person on any personId route, without disclosing cross-tenant existence. JOURNEY_STAGE_NOT_FOUND is used when a supplied journeyStageId does not belong to the validated organization. Relvio v1 does not define PERSON_DUPLICATE, EMAIL_ALREADY_EXISTS, PHONE_ALREADY_EXISTS, or PERSON_ALREADY_DELETED; Person.email and Person.phone are not unique and duplicates are allowed.
+PERSON_NOT_FOUND is used for an absent, deleted, or cross-tenant Person on any personId route, without disclosing cross-tenant existence. JOURNEY_STAGE_NOT_FOUND is used when a supplied journeyStageId does not belong to the validated organization, or (for Journey Stage routes) for an absent, already-deleted, or cross-tenant stageId. Relvio v1 does not define PERSON_DUPLICATE, EMAIL_ALREADY_EXISTS, PHONE_ALREADY_EXISTS, or PERSON_ALREADY_DELETED; Person.email and Person.phone are not unique and duplicates are allowed.
+
+Stable v1 codes for the Journey Stage and Person Journey domain:
+
+INVALID_STAGE_ORDER
+JOURNEY_STAGE_IN_USE
+PERSON_ALREADY_IN_STAGE
+
+INVALID_STAGE_ORDER is used for any Reorder Journey Stages request that is malformed, incomplete, contains a foreign stage, or contains a duplicate, without disclosing whether a foreign stage id exists. JOURNEY_STAGE_IN_USE is used when Delete Journey Stage targets a stage still referenced by PersonJourneyHistory as fromStageId or toStageId. PERSON_ALREADY_IN_STAGE is used when a journey movement request targets the Person's current stage.
 
 Example error codes for other areas:
 
@@ -590,44 +598,116 @@ Profile activity
 
 Timeline entries should be returned newest first.
 
+V1 Operational Journey Template
+
+Each Organization has exactly one operational JourneyTemplate in v1 application behavior. It is internal structural infrastructure required by the approved schema, not a user-facing resource: there is no v1 JourneyTemplate list, create, update, or delete endpoint, no template selector anywhere in the product, and no template switching. The Prisma schema's permissiveness (multiple JourneyTemplate rows are structurally possible per organization) does not authorize application behavior to create or expose more than one. User-facing Journey Template management/customization (naming, multiple templates, a workflow builder) remains deferred and requires separate future authority; see Feature_Backlog.md.
+
 Journey Stage Endpoints
+
+All five endpoints below require the global access-token guard, OrganizationMembershipGuard, and a validated organization context; none is public. Every stage always belongs to the Organization's single operational JourneyTemplate. journeyTemplateId is never exposed in API responses.
+
 List Journey Stages
 GET /organizations/{organizationId}/journey-stages
+
+Success response data:
+
+{
+  "stages": [
+    { "id": "string", "name": "string", "position": 1 }
+  ]
+}
+
+Ordered by position ascending, then id ascending. Empty state: { "stages": [] }, HTTP 200.
+
+The approved schema has no description column for Journey Stages; the position field is the schema's order column exposed under this response key. A description field is not part of this v1 contract; adding one is a future schema decision outside current authority.
+
 Create Journey Stage
 POST /organizations/{organizationId}/journey-stages
+
+Request fields (no others accepted):
+
+{ "name": "string" }
+
+name is required, trimmed, and must remain non-empty after trim. The new stage always attaches to the Organization's single operational JourneyTemplate. position is assigned as the current maximum position in that template plus 1, or 1 if no stages exist. Duplicate stage names are allowed; the schema does not constrain name uniqueness. Creation never moves any Person.
+
+Success response data (HTTP 201):
+
+{ "stage": { "id": "string", "name": "string", "position": 1 } }
+
 Update Journey Stage
 PATCH /organizations/{organizationId}/journey-stages/{stageId}
+
+Mutable fields (no others accepted): { "name": "string (optional)" }. At least one field must be supplied; today that is only name, which must be trimmed and non-empty (never null). position cannot be changed through this endpoint (see Reorder), and a stage can never move between templates. Success response data matches Create Journey Stage's shape.
+
 Reorder Journey Stages
-PATCH /organizations/{organizationId}/journey-stages/reorder
+POST /organizations/{organizationId}/journey-stages/reorder
+
+Request:
+
+{ "stageIds": ["string"] }
+
+stageIds is required and non-empty; each value must be UUID-compatible with no duplicates; the list must contain every current stage of the Organization's operational template exactly once (no foreign stage, no missing current stage, no extra stage). Request order becomes positions 1..N, applied atomically. Reorder never mutates PersonJourneyHistory and never changes any Person's current stage.
+
+Success response data: { "stages": [ { "id": "string", "name": "string", "position": 1 } ] }, ordered by the new position then id.
+
+Stable error: INVALID_STAGE_ORDER, used for any violation above (missing/extra/foreign/duplicate stage, malformed input). It never discloses whether a foreign stage id actually exists.
+
 Delete Journey Stage
 DELETE /organizations/{organizationId}/journey-stages/{stageId}
 
-Deletion must be rejected or safely handled when people currently reference the stage.
+JourneyStage has no soft-delete column. Deletion is a hard delete, allowed only when the stage has zero PersonJourneyHistory references as either fromStageId or toStageId; a referenced stage is rejected with JOURNEY_STAGE_IN_USE. Deletion never rewrites history, never moves a Person automatically, and never renumbers remaining stage positions (gaps are allowed; a future Reorder call may normalize them).
+
+Success response data: { "success": true }. An absent, already-deleted, or cross-tenant stage returns JOURNEY_STAGE_NOT_FOUND.
 
 Person Journey
 View Person Journey
 GET /organizations/{organizationId}/people/{personId}/journey
 
-Returns:
+Person is scoped by id + validated organizationId + deletedAt null; an absent, deleted, or cross-tenant Person returns PERSON_NOT_FOUND.
 
-Current journey stage
-Journey stage history
-Transition dates
-Transition metadata
-Create Journey Transition
-POST /organizations/{organizationId}/people/{personId}/journey/transitions
-
-Example request:
+Success response data:
 
 {
-  "stage_id": "stage_id",
-  "note": "Completed follow-up.",
-  "occurred_at": "2026-07-10T10:00:00Z"
+  "currentJourneyStage": { "id": "string", "name": "string", "position": 1 } | null,
+  "history": [
+    {
+      "id": "string",
+      "fromStage": { "id": "string", "name": "string" } | null,
+      "toStage": { "id": "string", "name": "string" },
+      "note": "string | null",
+      "movedAt": "string",
+      "movedBy": { "id": "string", "firstName": "string", "lastName": "string" }
+    }
+  ]
 }
 
-Journey transitions must create immutable journey history records.
+currentJourneyStage is derived from the latest PersonJourneyHistory row (movedAt descending, then id descending); null when no history exists. history is ordered movedAt descending, then id descending, with no pagination in v1. note is the schema's notes column exposed under this response key. movedBy exposes only id, firstName, lastName — never email, phone, status, passwordHash, or deletedAt. If that User later becomes DISABLED or is soft-deleted, historical movedBy attribution remains visible unchanged; history is immutable.
 
-Historical journey records must not be overwritten when a person's current stage changes.
+Create Journey Movement
+POST /organizations/{organizationId}/people/{personId}/journey/transitions
+
+Request fields (no others accepted):
+
+{ "stageId": "string", "note": "string | null (optional)" }
+
+stageId is required and UUID-compatible. note is optional, trimmed, and an empty normalized value becomes null. The request must never accept movedBy, movedAt, fromStageId, personId, organizationId, or templateId; all are server-derived or path-derived.
+
+Person is scoped by id + validated organizationId + deletedAt null (PERSON_NOT_FOUND otherwise). The target stageId must belong (indirectly, through the operational JourneyTemplate) to the validated organization; an absent or cross-tenant target returns JOURNEY_STAGE_NOT_FOUND without disclosing foreign existence. Current stage is the latest PersonJourneyHistory row (movedAt desc, id desc); the first movement for a Person has fromStageId null, later movements use the current stage id. movedBy is always request.auth.userId; movedAt is always server-generated. Movement always appends exactly one new, immutable PersonJourneyHistory row; an existing row is never updated or deleted, and Person.currentJourneyStageId is never written.
+
+Moving to the Person's current stage is rejected with PERSON_ALREADY_IN_STAGE. Backward movement and skipping stages are both allowed; v1 defines no transition graph or rule engine. No authorization beyond validated organization membership is required in v1. The append is a single atomic operation.
+
+Success response data (HTTP 201):
+
+{
+  "movement": {
+    "id": "string",
+    "fromStage": { "id": "string", "name": "string" } | null,
+    "toStage": { "id": "string", "name": "string" },
+    "note": "string | null",
+    "movedAt": "string",
+    "movedBy": { "id": "string", "firstName": "string", "lastName": "string" }
+  }
+}
 
 Follow-Up Endpoints
 List Follow-Ups

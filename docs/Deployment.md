@@ -508,6 +508,24 @@ Credential-handling and security requirements for this fixture are governed by 1
 
 This document defines this fixture's authority boundary only. Implementing the fixture command is authorized as a separate implementation task.
 
+Local Journey Fixture (Development/Test Support)
+
+Relvio approves one additional, separate development/test-support mechanism extending the controlled-fixture concept, used solely to enable live local verification of the Journey Stage and Person Journey endpoints.
+
+This fixture is not user-facing Journey Template management and does not implement or replace any Journey Stage or Person Journey API endpoint.
+
+Scope: the fixture may create exactly one JourneyTemplate (description null) for the existing controlled fixture Organization, and exactly two JourneyStages attached to it at positions 1 and 2. It must create zero PersonJourneyHistory and zero other product-domain or auth-token record.
+
+Input: the fixture reads the required JOURNEY_FIXTURE_TEMPLATE_NAME, JOURNEY_FIXTURE_STAGE_ONE_NAME, and JOURNEY_FIXTURE_STAGE_TWO_NAME environment variables (trimmed, must be non-empty, no default). It reuses the existing AUTH_FIXTURE_EMAIL and AUTH_FIXTURE_ORGANIZATION_NAME only to locate the already-existing controlled fixture User, membership, and Organization; it never reads AUTH_FIXTURE_PASSWORD.
+
+Idempotency: the fixture is idempotent on an exact matching operational template plus exactly two matching stages at the expected positions. An existing exact match must not be mutated; no upsert-that-updates is approved. Any partial state (wrong stage count or positions, or multiple candidate templates) fails clearly rather than being repaired or guessed.
+
+Execution boundary: the fixture must refuse to run when NODE_ENV=production. It is manual invocation only and must never auto-run during application bootstrap, npm install, Prisma generate, Prisma migrate, tests, or build. No Prisma seed hook is approved for this mechanism.
+
+Credential-handling and security requirements for this fixture are governed by 16_Security.md.
+
+This document defines this fixture's authority boundary only. Implementing the fixture command is authorized as a separate implementation task.
+
 Database Deployment
 
 PostgreSQL is the approved primary relational database.

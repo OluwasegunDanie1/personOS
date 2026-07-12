@@ -241,7 +241,7 @@ Journey Opportunities
 
 Potential Journey opportunities include:
 
-Journey templates
+User-facing Journey Template management (creating, naming, or switching between multiple templates)
 Journey analytics
 Journey configuration improvements
 Assisted stage recommendations
@@ -251,6 +251,8 @@ Multi-path journey structures
 Branching journey logic
 
 These are not approved Relvio v1 requirements.
+
+This exclusion is scoped to user-facing Journey Template management and customization. It does not exclude the internal, non-user-facing, single operational JourneyTemplate container approved as required v1 infrastructure by 12_Database_Design.md and 13_API_Specification.md; that container is not a workflow builder and is never exposed as a manageable resource.
 
 Automation must not be added before core Journey behavior is validated.
 

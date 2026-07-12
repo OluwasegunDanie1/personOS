@@ -240,6 +240,8 @@ Fields:
 
 status is stored as a plain string column. The closed v1 API allowlist for this value is ACTIVE or INACTIVE, defined by 13_API_Specification.md; this is an API-level constraint, not a Prisma enum change.
 
+current_journey_stage_id is a dormant column for v1: it is not the source of truth for a Person's current journey stage, must not be required to stay synchronized, and must not be exposed in v1 API responses. The authoritative current stage is always derived from the latest Person Journey History row (see below). There is no journey_template_id column on People; a Person never belongs to a JourneyTemplate directly, only through PersonJourneyHistory.
+
 ---
 
 ## Tags
@@ -303,6 +305,8 @@ Fields:
 - name
 - description
 
+There is no is_default or similar flag column. For Relvio v1, application behavior treats exactly one JourneyTemplate row per organization_id as the single operational template; this is an application-level invariant, not a schema-enforced constraint. The schema permitting multiple rows per organization does not authorize v1 application behavior to create or expose more than one. JourneyTemplate is internal application infrastructure in v1: it is not exposed as a standalone user-facing API resource, and there is no v1 create/update/delete/list endpoint for it. Full v1 authority is defined in 13_API_Specification.md and 16_Security.md.
+
 ---
 
 ## Journey Stages
@@ -315,6 +319,8 @@ Fields:
 - journey_template_id
 - name
 - order
+
+There is no description column. The API exposes the order field under the response key position; order and position refer to the same column. Any future description requirement is a schema decision outside existing authority.
 
 ---
 
@@ -332,6 +338,7 @@ Fields:
 - moved_at
 - notes
 
+The API exposes the notes field under the response key note; notes and note refer to the same column. moved_at (not changed_at) is the approved ordering field for determining a Person's current journey stage: the latest row by moved_at descending, then id descending.
 
 ---
 

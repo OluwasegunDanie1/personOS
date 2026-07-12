@@ -292,6 +292,20 @@ Person Tenant Isolation
 
 For any personId route, service-level Person access must scope by both id = personId and organizationId = the validated organization context; a personId-only lookup is prohibited. Cross-tenant Person access and an absent or soft-deleted Person return the identical stable error, PERSON_NOT_FOUND, without disclosing whether a Person exists in another tenant's organization.
 
+Development Journey Fixture Security
+
+A fourth, separate development/test-support mechanism extends the same controlled-fixture concept to enable live local verification of the Journey Stage and Person Journey endpoints. It may create exactly one JourneyTemplate (description null) for the existing controlled fixture Organization and exactly two JourneyStages attached to it (positions 1 and 2). It must create zero PersonJourneyHistory and zero other records.
+
+This fixture reuses AUTH_FIXTURE_EMAIL and AUTH_FIXTURE_ORGANIZATION_NAME only to locate the existing controlled User, membership, and Organization; it reads the required, non-default JOURNEY_FIXTURE_TEMPLATE_NAME, JOURNEY_FIXTURE_STAGE_ONE_NAME, and JOURNEY_FIXTURE_STAGE_TWO_NAME environment variables (trimmed, non-empty). It never reads AUTH_FIXTURE_PASSWORD.
+
+The fixture is idempotent on an exact matching operational template plus exactly two matching stages at the expected positions; existing matching records must not be mutated (no upsert-that-updates). Any partial match (wrong stage count, wrong positions, or multiple candidate templates) fails clearly rather than being repaired or guessed. It must refuse to run when NODE_ENV=production, is invoked manually only, and must never auto-run during application bootstrap, npm install, Prisma generate, Prisma migrate, tests, or build. It is test/development support only and does not implement user-facing Journey Template management.
+
+Journey Tenant Isolation
+
+JourneyTemplate is scoped directly by organizationId = the validated organization context. JourneyStage ownership is indirect: a stageId is valid only when its journeyTemplateId resolves to a JourneyTemplate whose organizationId matches the validated organization context, and that template must be the Organization's single operational template; an absent or cross-tenant stage returns JOURNEY_STAGE_NOT_FOUND without disclosing foreign existence. PersonJourneyHistory ownership is doubly indirect (through personId and through fromStageId/toStageId); it must never be fetched by personId alone for organization-scoped API use — Person tenant ownership (id + organizationId + deletedAt null) must be validated first. For journey movement, Person tenant ownership and target Stage tenant ownership are each validated independently before any PersonJourneyHistory row is appended. Reorder validation (INVALID_STAGE_ORDER) never discloses whether a supplied foreign stage id exists.
+
+Journey history remains immutable: movedBy exposes only id, firstName, lastName (never email, phone, status, passwordHash, or deletedAt), and historical attribution remains visible unchanged even if that User later becomes DISABLED or is soft-deleted.
+
 Authorization
 
 Relvio uses role and permission-based authorization.
