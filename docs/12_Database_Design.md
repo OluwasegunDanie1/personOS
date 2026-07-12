@@ -395,6 +395,8 @@ Fields:
 - status
 - completed_at
 
+There is no created_at, updated_at, or deleted_at column on FollowUp. FollowUp has no relationship to JourneyTemplate/JourneyStage. status is stored as a plain string column; the closed v1 API allowlist for this value is PENDING, IN_PROGRESS, or COMPLETED, defined by 13_API_Specification.md — an API-level constraint, not a Prisma enum change, following the same pattern as Person.status. There is no Delete Follow-Up endpoint; the absence of a deleted_at column reflects that this is not an oversight.
+
 ---
 
 ## Notes

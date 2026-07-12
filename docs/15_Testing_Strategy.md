@@ -650,21 +650,27 @@ Pending offline attendance must not be silently lost.
 
 Follow-Up Testing
 
+Relvio v1 approves exactly five Follow-Up endpoints: List, Create, View, Update, and Complete Follow-Up. There is no Delete Follow-Up endpoint; FollowUp has no deletedAt column, and this is a controlled decision, not an oversight. FollowUp has no createdAt/updatedAt column and no Journey relationship.
+
+The closed v1 FollowUp.status value set is exactly PENDING, IN_PROGRESS, COMPLETED — matching the approved UI's three Follow-up groupings. CANCELLED, OVERDUE, SNOOZED, BLOCKED, ESCALATED, or any other value must be rejected as a validation error. Overdue is a due-date-derived condition computed from dueDate, never a persisted or accepted status value.
+
 Verify:
 
-List follow-ups
-Filter follow-ups
-Create follow-up
-View follow-up
-Update follow-up
-Complete follow-up
-Assigned user
-Due date
-Person relationship
-
-Completing a follow-up should create the expected activity where required.
-
-Test overdue date behaviour.
+List follow-ups with exactly the approved query params: cursor, limit, status, assigned_user_id, person_id, due_date, sort
+Sort allowlist exactly dueDate_asc (default, nulls last), dueDate_desc (nulls last), title_asc, each tie-broken by id ascending
+Cursor pagination (opaque, sort-bound), matching the People/Events convention
+due_date filter is an exact equality match against the stored dueDate; there is no date-range, due_before/due_after, overdue=true, or calendar-window filter
+assigned_user_id filter requires the value to resolve to an active OrganizationMembership in the validated organization, else ASSIGNED_USER_NOT_FOUND
+person_id filter requires the value to belong to the validated organization, else PERSON_NOT_FOUND
+Create follow-up: personId and title required; status and completedAt are never client-accepted (status always starts PENDING, completedAt always starts null)
+assignedTo on Create/Update must resolve to an active OrganizationMembership in the validated organization, else ASSIGNED_USER_NOT_FOUND; global User existence alone is not sufficient
+View follow-up: cross-tenant/absent returns FOLLOW_UP_NOT_FOUND
+Update follow-up: partial-update semantics; status accepts only PENDING or IN_PROGRESS (never COMPLETED); nullable-field clearing for description/dueDate/assignedTo
+Update follow-up rejects any status value on an already-COMPLETED FollowUp with FOLLOW_UP_ALREADY_COMPLETED; a completed FollowUp can never be reopened through Update
+Complete follow-up: sets status to COMPLETED and completedAt to the server clock
+Complete follow-up is idempotent: repeating it on an already-COMPLETED FollowUp returns the row unchanged, including the original completedAt, which is never overwritten
+Completing a follow-up never creates a Timeline/Activity record, a Notification, or a Journey record; no such persisted model exists
+Person relationship (personId) tenant-scoped exactly like other People-referencing domains
 
 Communication Testing
 Conversations and Messages

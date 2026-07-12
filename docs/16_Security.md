@@ -326,6 +326,14 @@ Attendance Tenant Isolation
 
 Attendance is scoped directly by organizationId, since the schema gives Attendance its own organizationId column; this direct column must always be included in Attendance queries in addition to any Event or Person relation. Before any Attendance row is read or written, Event tenant ownership (id + organizationId + deletedAt null) and Person tenant ownership (id + organizationId + deletedAt null) must each be validated independently — an Attendance row must never be reached only through an eventId or personId path parameter without first confirming both parents belong to the validated organization context. A cross-tenant or absent Event returns EVENT_NOT_FOUND; a cross-tenant or absent Person returns PERSON_NOT_FOUND; neither discloses foreign existence.
 
+Follow-Up Tenant Isolation
+
+For any followUpId route, service-level FollowUp access must scope by id = followUpId and organizationId = the validated organization context; a followUpId-only lookup is prohibited. FollowUp has no deletedAt column, so this scoping is exactly (id, organizationId). Cross-tenant FollowUp access and an absent FollowUp return the identical stable error, FOLLOW_UP_NOT_FOUND, without disclosing whether a FollowUp exists in another tenant's organization. The personId relation must independently satisfy Person Tenant Isolation above (id + organizationId + deletedAt null), returning PERSON_NOT_FOUND otherwise.
+
+Follow-Up Assignment Tenant Rule
+
+assignedTo references a global User directly, exactly like Event.createdBy and Attendance.checkedInBy. Global User existence is never sufficient authorization: an assignedTo value must resolve to a User holding an active OrganizationMembership for the validated organization context (the same organizationId_userId membership lookup used by OrganizationMembershipGuard), else ASSIGNED_USER_NOT_FOUND. A User who is a member of a different organization, or of no organization, must be rejected identically to a nonexistent User, without disclosing which case applies.
+
 Authorization
 
 Relvio uses role and permission-based authorization.

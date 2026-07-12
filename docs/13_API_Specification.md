@@ -710,25 +710,137 @@ Success response data (HTTP 201):
 }
 
 Follow-Up Endpoints
+
+Follow-ups are organization-owned resources. All five Follow-Up endpoints below require the global access-token guard, OrganizationMembershipGuard membership validation, and a validated request.organization context. There is no Delete Follow-Up endpoint; FollowUp has no deletedAt column, and this is an intentional, controlled decision, not an oversight.
+
+The approved FollowUp schema has no createdAt, updatedAt, or deletedAt column, and no relationship to JourneyTemplate/JourneyStage. Nothing in this contract may assume a persisted Timeline/Activity record, an automatic notification, or a Journey coupling.
+
+For any route containing followUpId, service-level FollowUp access must scope by both id = followUpId and organizationId = validated organizationId. A followUpId-only lookup is prohibited. An absent or cross-tenant FollowUp returns the stable error FOLLOW_UP_NOT_FOUND, without disclosing cross-tenant existence.
+
+Follow-Up Status
+
+The closed v1 accepted API values for FollowUp.status are exactly:
+
+PENDING
+IN_PROGRESS
+COMPLETED
+
+The underlying database column remains a plain string; this is an API-level allowlist, not a schema enum. Default status on creation is PENDING. No other status value (CANCELLED, OVERDUE, SNOOZED, BLOCKED, ESCALATED, or any other) is approved. Overdue is a due-date-derived condition computed by comparing dueDate to the current time; it is never a persisted or accepted status value.
+
 List Follow-Ups
 GET /organizations/{organizationId}/follow-ups
 
-Supports filters:
+Approved query parameters (exactly these): cursor, limit, status, assigned_user_id, person_id, due_date, sort.
 
-status
-assigned_user_id
-person_id
-due_date
+limit: default 20, minimum 1, maximum 100.
+
+sort: exactly one of dueDate_asc (default), dueDate_desc, title_asc. FollowUp has no createdAt/updatedAt column, so no sort based on creation or update time is defined.
+
+dueDate_asc: dueDate ascending with nulls last, id ascending.
+dueDate_desc: dueDate descending with nulls last, id ascending.
+title_asc: title ascending, id ascending.
+
+Every sort ends with id ascending as the deterministic tie-break. Cursor pagination is opaque to the client and bound to the active sort, following the same convention already approved for People and Events; its internal encoding is an implementation detail, not part of this API contract.
+
+status: optional filter, one of PENDING, IN_PROGRESS, COMPLETED.
+
+assigned_user_id: optional filter. The supplied value must resolve to a User holding an active OrganizationMembership in the validated organization; if it does not, return ASSIGNED_USER_NOT_FOUND without disclosing whether the User exists globally or in another organization. A FollowUp with assignedTo null never matches a supplied assigned_user_id filter.
+
+person_id: optional filter. The supplied value must belong to the validated organization (id + organizationId + deletedAt null); if it does not, return PERSON_NOT_FOUND (the existing People-domain error code), matching the journeyStageId precedent in the People list contract.
+
+due_date: optional filter. Must be an ISO 8601 datetime string representing an absolute instant (same rule as Create/Update below). Used as an exact equality match against the stored dueDate value; there is no date-range, due_before/due_after, overdue=true, calendar-window, or reminder-window filter. A FollowUp with dueDate null never matches a supplied due_date filter.
+
+Invalid sort, limit, status, or other query values use the existing standard validation error handling.
+
+Success response data:
+
+{
+  "followUps": [
+    {
+      "id": "string",
+      "title": "string",
+      "description": "string | null",
+      "dueDate": "string | null",
+      "status": "PENDING | IN_PROGRESS | COMPLETED",
+      "completedAt": "string | null",
+      "person": { "id": "string", "firstName": "string", "lastName": "string" },
+      "assignedTo": { "id": "string", "firstName": "string", "lastName": "string" } | null
+    }
+  ],
+  "nextCursor": "string | null"
+}
+
+Empty state (HTTP 200, standard success envelope): { "followUps": [], "nextCursor": null }.
+
 Create Follow-Up
 POST /organizations/{organizationId}/follow-ups
+
+Request fields (no others accepted):
+
+{
+  "personId": "string",
+  "title": "string",
+  "description": "string | null (optional)",
+  "dueDate": "string | null (optional)",
+  "assignedTo": "string | null (optional)"
+}
+
+Required: personId, title.
+
+Normalization: title and description are trimmed; an empty normalized optional value becomes null.
+
+Validation: title must remain non-empty after trim; personId must belong to the validated organization (id + organizationId + deletedAt null), else PERSON_NOT_FOUND; dueDate, when supplied and non-null, must be an ISO 8601 datetime string representing an absolute instant (an explicit UTC offset or Z suffix is required); assignedTo, when supplied and non-null, must resolve to a User holding an active OrganizationMembership in the validated organization, else ASSIGNED_USER_NOT_FOUND.
+
+status and completedAt are never accepted through this endpoint; they are always server-derived (status is always PENDING, completedAt is always null on creation). organizationId is always path-derived. Creation never creates a Timeline/Activity record, a Notification, or any Journey record.
+
+Success response data (HTTP 201, standard success envelope):
+
+{
+  "followUp": {
+    "id": "string",
+    "title": "string",
+    "description": "string | null",
+    "dueDate": "string | null",
+    "status": "PENDING",
+    "completedAt": null,
+    "person": { "id": "string", "firstName": "string", "lastName": "string" },
+    "assignedTo": { "id": "string", "firstName": "string", "lastName": "string" } | null
+  }
+}
+
 View Follow-Up
 GET /organizations/{organizationId}/follow-ups/{followUpId}
+
+Success response data matches Create Follow-Up's shape (with whatever status/completedAt/assignedTo the FollowUp currently holds). An absent or cross-tenant FollowUp returns FOLLOW_UP_NOT_FOUND.
+
 Update Follow-Up
 PATCH /organizations/{organizationId}/follow-ups/{followUpId}
+
+Mutable fields (no others accepted): title, description, dueDate, assignedTo, status — all optional. completedAt is never accepted through this endpoint under any circumstance.
+
+Partial-update semantics: at least one approved mutable field must be supplied. title cannot be null or empty after trim. description, dueDate, and assignedTo may each be explicitly nulled (an empty normalized string also becomes null); assignedTo null means unassigned. dueDate and assignedTo follow the same validation as Create Follow-Up.
+
+status, when supplied, must be one of PENDING or IN_PROGRESS only; COMPLETED is never an accepted value through this endpoint (see Complete Follow-Up below). If the FollowUp's current stored status is already COMPLETED, supplying status in the same request is rejected with FOLLOW_UP_ALREADY_COMPLETED, regardless of the supplied value; a completed FollowUp can never be returned to an incomplete state through Update. All other approved fields (title, description, dueDate, assignedTo) remain updatable on an already-completed FollowUp.
+
+Success response data matches Create Follow-Up's shape. An absent or cross-tenant FollowUp returns FOLLOW_UP_NOT_FOUND.
+
 Complete Follow-Up
 PATCH /organizations/{organizationId}/follow-ups/{followUpId}/complete
 
-Completing a follow-up may create a timeline activity.
+Request: no fields accepted; the request body must be empty.
+
+This is the sole approved path to the COMPLETED status. On a FollowUp whose current status is not COMPLETED, this sets status to COMPLETED and completedAt to the server clock at write time. On a FollowUp whose current status is already COMPLETED, this endpoint is idempotent: it returns the FollowUp unchanged, including its original completedAt value, which is never overwritten by a repeat call. This endpoint never reverses completion; there is no path back to PENDING or IN_PROGRESS once COMPLETED. Completing a Follow-Up never creates a Timeline/Activity record, a Notification, or any Journey record; no such persisted model exists.
+
+Success response data (HTTP 200, standard success envelope) matches Create Follow-Up's shape.
+
+Follow-Up-Domain Error Codes
+
+FOLLOW_UP_NOT_FOUND: an absent or cross-tenant FollowUp for any followUpId route.
+PERSON_NOT_FOUND: an absent or cross-tenant personId (Create Follow-Up) or person_id filter value (List Follow-Ups); reuses the existing People-domain code.
+ASSIGNED_USER_NOT_FOUND: an assignedTo value (Create/Update) or assigned_user_id filter value (List) that does not resolve to an active OrganizationMembership in the validated organization.
+FOLLOW_UP_ALREADY_COMPLETED: an Update Follow-Up request that supplies status on a FollowUp whose current status is already COMPLETED.
+
+Neither this document nor any Follow-Up endpoint defines a Delete Follow-Up operation, a CANCELLED/OVERDUE/SNOOZED/BLOCKED/ESCALATED status, or a completion-history/reversal code; none of these are approved v1 codes or endpoints.
 
 Event Endpoints
 
@@ -1253,7 +1365,7 @@ Examples:
 
 GET /organizations/{organizationId}/people?journey_stage=visitor
 GET /organizations/{organizationId}/events?category=conference
-GET /organizations/{organizationId}/follow-ups?status=pending
+GET /organizations/{organizationId}/follow-ups?status=PENDING
 
 Filters must use documented field names.
 
