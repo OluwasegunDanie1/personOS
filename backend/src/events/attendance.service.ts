@@ -66,6 +66,11 @@ export interface RecordAttendanceResult {
   created: boolean;
 }
 
+export interface PersonAttendanceSummary {
+  totalCount: number;
+  currentMonthCount: number;
+}
+
 interface EventAttendanceRow {
   id: string;
   status: AttendanceStatus;
@@ -221,6 +226,38 @@ export class AttendanceService {
     const nextCursor = hasMore ? encodeCursor({ id: pageRows[pageRows.length - 1].id, sort }) : null;
 
     return { attendance: pageRows.map((row) => this.toPersonAttendanceEntry(row)), nextCursor };
+  }
+
+  /**
+   * Total + current-calendar-month Attendance counts for one Person, via
+   * bounded database COUNT operations only (never a per-record loop or a
+   * findMany used merely to count .length). The month window uses a single
+   * captured server instant (never two independent `new Date()` calls, per
+   * DashboardService's existing precedent) with UTC boundaries: current
+   * month start inclusive, next month start exclusive - never a rolling
+   * 30-day window, and never Event.startDate.
+   */
+  async summaryForPerson(organizationId: string, personId: string): Promise<{ attendanceSummary: PersonAttendanceSummary }> {
+    // Person tenant ownership is validated independently before any
+    // Attendance read; never a personId-only lookup.
+    await this.assertActivePerson(organizationId, personId);
+
+    const now = new Date();
+    const currentMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const nextMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
+
+    const [totalCount, currentMonthCount] = await Promise.all([
+      this.prisma.attendance.count({ where: { organizationId, personId } }),
+      this.prisma.attendance.count({
+        where: {
+          organizationId,
+          personId,
+          checkedInAt: { gte: currentMonthStart, lt: nextMonthStart },
+        },
+      }),
+    ]);
+
+    return { attendanceSummary: { totalCount, currentMonthCount } };
   }
 
   private async assertActivePerson(organizationId: string, personId: string): Promise<void> {

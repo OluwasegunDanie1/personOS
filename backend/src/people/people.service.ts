@@ -3,11 +3,11 @@ import { Prisma } from '../../generated/prisma/client';
 import { ApiException } from '../common/http/api-exception';
 import { PrismaService } from '../database/prisma.service';
 import { decodeCursor, encodeCursor } from './cursor.util';
-import { parseCalendarDateOnlyToUtcDate } from './date-of-birth.validator';
+import { formatUtcDateOnly, parseCalendarDateOnlyToUtcDate } from './date-of-birth.validator';
 import { CreatePersonDto } from './dto/create-person.dto';
 import { ListPeopleQueryDto } from './dto/list-people-query.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
-import { DEFAULT_PEOPLE_LIMIT, PEOPLE_ERROR_CODES, PeopleSort } from './people.constants';
+import { DEFAULT_PEOPLE_LIMIT, PEOPLE_ERROR_CODES, PeopleSort, PersonGenderValue } from './people.constants';
 
 type PrismaOrderBy = Record<string, 'asc' | 'desc'>;
 
@@ -55,9 +55,18 @@ export interface PeopleListResult {
   nextCursor: string | null;
 }
 
+/**
+ * Detail-only widening (Product Task 039): gender/dateOfBirth/address are
+ * approved Create Person write authority that Detail can now read back.
+ * Deliberately not added to PersonSummary itself so List/Create/Update -
+ * which all reuse toSummary() directly - never widen.
+ */
 export interface PersonDetail extends PersonSummary {
   tags: Array<{ id: string; name: string }>;
   currentJourneyStage: { id: string; name: string } | null;
+  gender: PersonGenderValue | null;
+  dateOfBirth: string | null;
+  address: string | null;
 }
 
 const PERSON_SELECT = {
@@ -70,6 +79,24 @@ const PERSON_SELECT = {
   profilePhoto: true,
   createdAt: true,
 } as const;
+
+/**
+ * Detail-only select. A separate constant (rather than widening the shared
+ * PERSON_SELECT) so List/Create/Update's Prisma queries are never touched by
+ * this correction - only detail() ever uses this.
+ */
+const PERSON_DETAIL_SELECT = {
+  ...PERSON_SELECT,
+  gender: true,
+  dateOfBirth: true,
+  address: true,
+} as const;
+
+interface PersonDetailRow extends PersonRow {
+  gender: string | null;
+  dateOfBirth: Date | null;
+  address: string | null;
+}
 
 @Injectable()
 export class PeopleService {
@@ -143,8 +170,8 @@ export class PeopleService {
   async detail(organizationId: string, personId: string): Promise<{ person: PersonDetail }> {
     const person = (await this.prisma.person.findFirst({
       where: { id: personId, organizationId, deletedAt: null },
-      select: PERSON_SELECT,
-    })) as PersonRow | null;
+      select: PERSON_DETAIL_SELECT,
+    })) as PersonDetailRow | null;
 
     if (!person) {
       throw this.personNotFoundError();
@@ -167,6 +194,9 @@ export class PeopleService {
         ...this.toSummary(person),
         tags: personTags.map((personTag) => personTag.tag),
         currentJourneyStage: latestHistory ? latestHistory.toStage : null,
+        gender: (person.gender as PersonGenderValue | null) ?? null,
+        dateOfBirth: person.dateOfBirth ? formatUtcDateOnly(person.dateOfBirth) : null,
+        address: person.address ?? null,
       },
     };
   }

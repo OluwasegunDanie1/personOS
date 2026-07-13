@@ -600,11 +600,16 @@ Success response data:
     "tags": [
       { "id": "string", "name": "string" }
     ],
-    "currentJourneyStage": { "id": "string", "name": "string" } | null
+    "currentJourneyStage": { "id": "string", "name": "string" } | null,
+    "gender": "MALE | FEMALE | null",
+    "dateOfBirth": "YYYY-MM-DD | null",
+    "address": "string | null"
   }
 }
 
-Tags must belong to the same organization through the Person's PersonTag relations, ordered name ascending then id ascending. currentJourneyStage uses the same latest-history rule as the journeyStageId filter above. Journey history, attendance history/summary, follow-ups, and notes are not embedded here; those remain separate product concerns/endpoints (see Person Timeline and Person Journey below). A deleted Person behaves as PERSON_NOT_FOUND.
+Tags must belong to the same organization through the Person's PersonTag relations, ordered name ascending then id ascending. currentJourneyStage uses the same latest-history rule as the journeyStageId filter above. Journey history, attendance history/summary, follow-ups, and notes are not embedded here; those remain separate product concerns/endpoints (see Person Timeline, Person Journey, and Person Attendance Summary below). A deleted Person behaves as PERSON_NOT_FOUND.
+
+gender, dateOfBirth, and address are read back exactly as persisted by Create Person (see Create Person below); this is Detail-only read authority. They are not added to the List response's Person shape, Create Person's own response, or Update Person's own response — only this View Person endpoint exposes them. dateOfBirth is serialized as an exact date-only YYYY-MM-DD string derived from the stored calendar date's UTC components; it is never rendered as a full timestamp and never shifted by a server timezone conversion.
 
 Update Person
 PATCH /organizations/{organizationId}/people/{personId}
@@ -1138,6 +1143,22 @@ Success response data:
 Empty state (HTTP 200): { "attendance": [], "nextCursor": null }.
 
 A row remains visible in this history even after its referenced Event is later soft-deleted; Event.deletedAt never hides or removes historical Attendance for a Person.
+
+Person Attendance Summary
+GET /organizations/{organizationId}/people/{personId}/attendance/summary
+
+Person is validated using the same active, organization-scoped authority as Person Attendance above (id + organizationId + deletedAt null, else PERSON_NOT_FOUND).
+
+Success response data:
+
+{
+  "attendanceSummary": {
+    "totalCount": 0,
+    "currentMonthCount": 0
+  }
+}
+
+totalCount is the count of immutable Attendance records for the Person within the validated organization (organizationId + personId), with no date bound. currentMonthCount is the same scope additionally bounded to the current calendar month by Attendance.checkedInAt: current month start (inclusive) through next month start (exclusive), evaluated against the backend server's UTC clock at request time. This is a fixed calendar-month window, never a rolling 30-day window, and is never derived from Event.startDate. Both counts are computed as bounded database aggregate counts; no Attendance rows are loaded into application memory to compute them. This endpoint returns only these two counts — no latestAttendance, no attendance history, no event summaries, no percentage, no streak, and no monthly trend array are part of this contract.
 
 Attendance Lifecycle and Immutability
 

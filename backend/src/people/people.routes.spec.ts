@@ -187,6 +187,57 @@ describe('People route composition', () => {
     expect(person.lastAttendance).toEqual({ checkedInAt: '2026-05-25T09:00:00.000Z' });
   });
 
+  it('GET detail includes gender, dateOfBirth, and address end-to-end (Product Task 039)', async () => {
+    prisma.person.findFirst.mockResolvedValue({
+      id: PERSON_ID,
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+      email: null,
+      phone: null,
+      status: 'ACTIVE',
+      profilePhoto: null,
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      gender: 'FEMALE',
+      dateOfBirth: new Date(Date.UTC(1990, 11, 10)),
+      address: '221B Baker Street',
+    });
+    prisma.personTag.findMany.mockResolvedValue([]);
+    prisma.personJourneyHistory.findFirst.mockResolvedValue(null);
+
+    const { status, json } = await request('GET', detailPath, validToken);
+
+    expect(status).toBe(200);
+    const person = json.data!.person as Record<string, unknown>;
+    expect(person.gender).toBe('FEMALE');
+    expect(person.dateOfBirth).toBe('1990-12-10');
+    expect(person.address).toBe('221B Baker Street');
+  });
+
+  it('GET detail preserves null for gender, dateOfBirth, and address end-to-end', async () => {
+    prisma.person.findFirst.mockResolvedValue({
+      id: PERSON_ID,
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+      email: null,
+      phone: null,
+      status: 'ACTIVE',
+      profilePhoto: null,
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      gender: null,
+      dateOfBirth: null,
+      address: null,
+    });
+    prisma.personTag.findMany.mockResolvedValue([]);
+    prisma.personJourneyHistory.findFirst.mockResolvedValue(null);
+
+    const { json } = await request('GET', detailPath, validToken);
+
+    const person = json.data!.person as Record<string, unknown>;
+    expect(person.gender).toBeNull();
+    expect(person.dateOfBirth).toBeNull();
+    expect(person.address).toBeNull();
+  });
+
   it('GET detail returns PERSON_NOT_FOUND for a cross-tenant/absent person', async () => {
     prisma.person.findFirst.mockResolvedValue(null);
 

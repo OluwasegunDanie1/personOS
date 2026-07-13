@@ -25,6 +25,7 @@ function createMockPrisma() {
       findMany: jest.fn(),
       create: jest.fn(),
       findUnique: jest.fn(),
+      count: jest.fn(),
     },
     person: { findFirst: jest.fn() },
   };
@@ -454,5 +455,156 @@ describe('AttendanceService', () => {
     expect(source).not.toMatch(/attendance\.update\(/);
     expect(source).not.toMatch(/attendance\.delete\(/);
     expect(source).not.toMatch(/attendance\.upsert\(/);
+  });
+
+  describe('summaryForPerson', () => {
+    beforeEach(() => {
+      // Deterministic clock: 2026-07-12T15:30:00.000Z (mid-month, mid-day UTC).
+      jest.useFakeTimers().setSystemTime(new Date('2026-07-12T15:30:00.000Z'));
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('validates the Person tenant ownership before counting Attendance', async () => {
+      prisma.person.findFirst.mockResolvedValue(null);
+
+      await expect(service.summaryForPerson(ORG_ID, PERSON_ID)).rejects.toThrow();
+      expect(prisma.attendance.count).not.toHaveBeenCalled();
+    });
+
+    it('preserves PERSON_NOT_FOUND for an absent/cross-tenant/soft-deleted Person', async () => {
+      prisma.person.findFirst.mockResolvedValue(null);
+
+      let error: ApiException | undefined;
+      try {
+        await service.summaryForPerson(ORG_ID, PERSON_ID);
+      } catch (e) {
+        error = e as ApiException;
+      }
+
+      expect(error).toBeInstanceOf(ApiException);
+      expect(error?.code).toBe('PERSON_NOT_FOUND');
+    });
+
+    it('totalCount is scoped by organizationId and personId only, with no date bound', async () => {
+      prisma.person.findFirst.mockResolvedValue({ id: PERSON_ID });
+      prisma.attendance.count.mockResolvedValue(0);
+
+      await service.summaryForPerson(ORG_ID, PERSON_ID);
+
+      const totalArgs = prisma.attendance.count.mock.calls[0][0];
+      expect(totalArgs.where).toEqual({ organizationId: ORG_ID, personId: PERSON_ID });
+    });
+
+    it('currentMonthCount is scoped by organizationId, personId, and the current UTC calendar-month window on checkedInAt', async () => {
+      prisma.person.findFirst.mockResolvedValue({ id: PERSON_ID });
+      prisma.attendance.count.mockResolvedValue(0);
+
+      await service.summaryForPerson(ORG_ID, PERSON_ID);
+
+      const monthArgs = prisma.attendance.count.mock.calls[1][0];
+      expect(monthArgs.where).toEqual({
+        organizationId: ORG_ID,
+        personId: PERSON_ID,
+        checkedInAt: { gte: new Date('2026-07-01T00:00:00.000Z'), lt: new Date('2026-08-01T00:00:00.000Z') },
+      });
+    });
+
+    it('behaviorally excludes previous-month, next-month-boundary, another Person, and another Organization Attendance from currentMonthCount', async () => {
+      jest.setSystemTime(new Date('2026-07-15T12:00:00.000Z'));
+      prisma.person.findFirst.mockResolvedValue({ id: PERSON_ID });
+
+      const OTHER_PERSON_ID = '99999999-9999-9999-9999-999999999999';
+      const OTHER_ORG_ID = '88888888-8888-8888-8888-888888888888';
+
+      // A fixture-backed count simulation (not the real Postgres query
+      // planner) that filters exactly the fields the service's `where`
+      // clause supplies, so the test proves actual inclusion/exclusion
+      // behavior rather than only the shape of the constructed filter.
+      const rows = [
+        { organizationId: ORG_ID, personId: PERSON_ID, checkedInAt: new Date('2026-06-30T23:59:59.999Z') },
+        { organizationId: ORG_ID, personId: PERSON_ID, checkedInAt: new Date('2026-08-01T00:00:00.000Z') },
+        { organizationId: ORG_ID, personId: OTHER_PERSON_ID, checkedInAt: new Date('2026-07-10T00:00:00.000Z') },
+        { organizationId: OTHER_ORG_ID, personId: PERSON_ID, checkedInAt: new Date('2026-07-10T00:00:00.000Z') },
+        { organizationId: ORG_ID, personId: PERSON_ID, checkedInAt: new Date('2026-07-01T00:00:00.000Z') },
+        { organizationId: ORG_ID, personId: PERSON_ID, checkedInAt: new Date('2026-07-31T23:59:59.999Z') },
+      ];
+
+      prisma.attendance.count.mockImplementation(async (args: Record<string, unknown>) => {
+        const where = args.where as {
+          organizationId: string;
+          personId: string;
+          checkedInAt?: { gte: Date; lt: Date };
+        };
+        return rows.filter((row) => {
+          if (row.organizationId !== where.organizationId) return false;
+          if (row.personId !== where.personId) return false;
+          if (where.checkedInAt) {
+            if (row.checkedInAt < where.checkedInAt.gte) return false;
+            if (row.checkedInAt >= where.checkedInAt.lt) return false;
+          }
+          return true;
+        }).length;
+      });
+
+      const result = await service.summaryForPerson(ORG_ID, PERSON_ID);
+
+      // totalCount: all 4 rows scoped to ORG_ID + PERSON_ID (June 30, Aug 1,
+      // July 1, July 31), regardless of date; the other-Person/other-Org
+      // rows are excluded by scope alone.
+      expect(result.attendanceSummary.totalCount).toBe(4);
+      // currentMonthCount: only the 2 July rows for ORG_ID + PERSON_ID;
+      // previous-month, next-month-boundary, another Person, and another
+      // Organization are each excluded.
+      expect(result.attendanceSummary.currentMonthCount).toBe(2);
+    });
+
+    it('derives the same month window regardless of time-of-day or day-of-month', async () => {
+      jest.setSystemTime(new Date('2026-07-31T23:59:59.999Z'));
+      prisma.person.findFirst.mockResolvedValue({ id: PERSON_ID });
+      prisma.attendance.count.mockResolvedValue(0);
+
+      await service.summaryForPerson(ORG_ID, PERSON_ID);
+
+      const monthArgs = prisma.attendance.count.mock.calls[1][0];
+      expect(monthArgs.where.checkedInAt).toEqual({
+        gte: new Date('2026-07-01T00:00:00.000Z'),
+        lt: new Date('2026-08-01T00:00:00.000Z'),
+      });
+    });
+
+    it('rolls the next-month boundary into the following calendar year across a December window', async () => {
+      jest.setSystemTime(new Date('2026-12-15T12:00:00.000Z'));
+      prisma.person.findFirst.mockResolvedValue({ id: PERSON_ID });
+      prisma.attendance.count.mockResolvedValue(0);
+
+      await service.summaryForPerson(ORG_ID, PERSON_ID);
+
+      const monthArgs = prisma.attendance.count.mock.calls[1][0];
+      expect(monthArgs.where.checkedInAt).toEqual({
+        gte: new Date('2026-12-01T00:00:00.000Z'),
+        lt: new Date('2027-01-01T00:00:00.000Z'),
+      });
+    });
+
+    it('returns the exact approved response shape with the resolved counts', async () => {
+      prisma.person.findFirst.mockResolvedValue({ id: PERSON_ID });
+      prisma.attendance.count.mockResolvedValueOnce(24).mockResolvedValueOnce(6);
+
+      const result = await service.summaryForPerson(ORG_ID, PERSON_ID);
+
+      expect(result).toEqual({ attendanceSummary: { totalCount: 24, currentMonthCount: 6 } });
+    });
+
+    it('never calls attendance.findMany (bounded COUNT only, never a per-record loop)', async () => {
+      prisma.person.findFirst.mockResolvedValue({ id: PERSON_ID });
+      prisma.attendance.count.mockResolvedValue(0);
+
+      await service.summaryForPerson(ORG_ID, PERSON_ID);
+
+      expect(prisma.attendance.findMany).not.toHaveBeenCalled();
+    });
   });
 });

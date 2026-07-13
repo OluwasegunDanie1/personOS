@@ -31,7 +31,7 @@ describe('Events/Attendance route composition', () => {
     user: { findUnique: jest.Mock };
     organizationMembership: { findUnique: jest.Mock };
     event: { findMany: jest.Mock; findFirst: jest.Mock; create: jest.Mock; update: jest.Mock };
-    attendance: { findMany: jest.Mock; create: jest.Mock; findUnique: jest.Mock };
+    attendance: { findMany: jest.Mock; create: jest.Mock; findUnique: jest.Mock; count: jest.Mock };
     person: { findFirst: jest.Mock };
   };
   let validToken: string;
@@ -44,7 +44,7 @@ describe('Events/Attendance route composition', () => {
       user: { findUnique: jest.fn() },
       organizationMembership: { findUnique: jest.fn() },
       event: { findMany: jest.fn(), findFirst: jest.fn(), create: jest.fn(), update: jest.fn() },
-      attendance: { findMany: jest.fn(), create: jest.fn(), findUnique: jest.fn() },
+      attendance: { findMany: jest.fn(), create: jest.fn(), findUnique: jest.fn(), count: jest.fn() },
       person: { findFirst: jest.fn() },
     };
 
@@ -354,5 +354,33 @@ describe('Events/Attendance route composition', () => {
 
     const rejectedStatus = await request('GET', `${personAttendancePath}?status=PRESENT`, validToken);
     expect(rejectedStatus.status).toBe(400);
+  });
+
+  it('GET person attendance summary reaches the summary handler and returns the approved envelope, distinct from the list route', async () => {
+    prisma.person.findFirst.mockResolvedValue({ id: PERSON_ID });
+    const findManyCallsBefore = prisma.attendance.findMany.mock.calls.length;
+    prisma.attendance.count.mockResolvedValueOnce(24).mockResolvedValueOnce(6);
+
+    const { status, json } = await request('GET', `${personAttendancePath}/summary`, validToken);
+
+    expect(status).toBe(200);
+    expect(json.data).toEqual({ attendanceSummary: { totalCount: 24, currentMonthCount: 6 } });
+    // Proves the static '/summary' suffix is routed to the summary handler,
+    // not silently absorbed by the parameterless base list() route (this
+    // mock accumulates calls across the whole file, so a delta is used
+    // rather than an absolute/"never called" assertion).
+    expect(prisma.attendance.findMany.mock.calls.length).toBe(findManyCallsBefore);
+  });
+
+  it('GET person attendance summary returns PERSON_NOT_FOUND for a cross-tenant/absent/soft-deleted Person', async () => {
+    prisma.person.findFirst.mockResolvedValue(null);
+    const countCallsBefore = prisma.attendance.count.mock.calls.length;
+
+    const { status, json } = await request('GET', `${personAttendancePath}/summary`, validToken);
+
+    expect(status).toBe(404);
+    expect(json.success).toBe(false);
+    expect(json.error?.code).toBe('PERSON_NOT_FOUND');
+    expect(prisma.attendance.count.mock.calls.length).toBe(countCallsBefore);
   });
 });

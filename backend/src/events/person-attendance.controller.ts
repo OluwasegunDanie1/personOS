@@ -9,6 +9,15 @@ import { ListPersonAttendanceQueryDto } from './dto/list-person-attendance-query
 export class PersonAttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}
 
+  // Registered before the base list() route: a static literal segment
+  // ('summary') is matched independently of the parameterless base path,
+  // but declaring the more specific route first follows the project's
+  // static-before-dynamic routing convention.
+  @Get('summary')
+  summary(@Req() request: AuthenticatedRequest, @Param('personId') personId: string) {
+    return this.attendanceService.summaryForPerson(request.organization!.organizationId, personId);
+  }
+
   @Get()
   list(
     @Req() request: AuthenticatedRequest,

@@ -75,3 +75,16 @@ export function parseCalendarDateOnlyToUtcDate(value: string): Date {
 
   return new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
 }
+
+/**
+ * Inverse of parseCalendarDateOnlyToUtcDate: reads the UTC calendar
+ * components of a @db.Date value back out as YYYY-MM-DD. Deliberately reads
+ * getUTC* (never local-time getters), so the emitted date never shifts by a
+ * server timezone offset regardless of where the process runs.
+ */
+export function formatUtcDateOnly(date: Date): string {
+  const year = date.getUTCFullYear().toString().padStart(4, '0');
+  const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+  const day = date.getUTCDate().toString().padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}

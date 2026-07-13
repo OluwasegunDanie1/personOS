@@ -17,11 +17,16 @@ function buildRequest(overrides: Partial<AuthenticatedRequest> = {}): Authentica
 }
 
 describe('PersonAttendanceController', () => {
-  let service: { listForPerson: jest.Mock };
+  let service: { listForPerson: jest.Mock; summaryForPerson: jest.Mock };
   let controller: PersonAttendanceController;
 
   beforeEach(() => {
-    service = { listForPerson: jest.fn().mockResolvedValue({ attendance: [], nextCursor: null }) };
+    service = {
+      listForPerson: jest.fn().mockResolvedValue({ attendance: [], nextCursor: null }),
+      summaryForPerson: jest
+        .fn()
+        .mockResolvedValue({ attendanceSummary: { totalCount: 0, currentMonthCount: 0 } }),
+    };
     controller = new PersonAttendanceController(service as unknown as AttendanceService);
   });
 
@@ -42,5 +47,26 @@ describe('PersonAttendanceController', () => {
     await controller.list(request, 'person-1', {});
 
     expect(service.listForPerson).toHaveBeenCalledWith(ORG_ID, 'person-1', {});
+  });
+
+  it("summary() is registered under the 'summary' sub-path", () => {
+    expect(Reflect.getMetadata(PATH_METADATA, controller.summary)).toBe('summary');
+  });
+
+  it('summary() uses request.organization.organizationId, never the raw path param', async () => {
+    const request = buildRequest({ params: { organizationId: 'attacker-supplied-id', personId: 'person-1' } });
+
+    await controller.summary(request, 'person-1');
+
+    expect(service.summaryForPerson).toHaveBeenCalledWith(ORG_ID, 'person-1');
+  });
+
+  it('summary() returns the service result unchanged', async () => {
+    service.summaryForPerson.mockResolvedValue({ attendanceSummary: { totalCount: 24, currentMonthCount: 6 } });
+    const request = buildRequest();
+
+    const result = await controller.summary(request, 'person-1');
+
+    expect(result).toEqual({ attendanceSummary: { totalCount: 24, currentMonthCount: 6 } });
   });
 });

@@ -492,8 +492,10 @@ describe('PeopleService', () => {
       expect(result.person).not.toHaveProperty('notes');
     });
 
-    it('maps the exact approved detail shape', async () => {
-      prisma.person.findFirst.mockResolvedValue(buildPersonRow());
+    it('maps the exact approved detail shape (Product Task 039: gender/dateOfBirth/address widened onto Detail only)', async () => {
+      prisma.person.findFirst.mockResolvedValue(
+        buildPersonRow({ gender: 'FEMALE', dateOfBirth: new Date(Date.UTC(1990, 11, 10)), address: '221B Baker Street' }),
+      );
       prisma.personTag.findMany.mockResolvedValue([{ tag: { id: 'tag-1', name: 'VIP' } }]);
       prisma.personJourneyHistory.findFirst.mockResolvedValue(null);
 
@@ -511,8 +513,64 @@ describe('PeopleService', () => {
           joinedAt: '2026-01-01T00:00:00.000Z',
           tags: [{ id: 'tag-1', name: 'VIP' }],
           currentJourneyStage: null,
+          gender: 'FEMALE',
+          dateOfBirth: '1990-12-10',
+          address: '221B Baker Street',
         },
       });
+    });
+
+    it('maps gender through unchanged', async () => {
+      prisma.person.findFirst.mockResolvedValue(buildPersonRow({ gender: 'MALE' }));
+      prisma.personTag.findMany.mockResolvedValue([]);
+      prisma.personJourneyHistory.findFirst.mockResolvedValue(null);
+
+      const result = await service.detail(ORG_ID, 'person-1');
+
+      expect(result.person.gender).toBe('MALE');
+    });
+
+    it('formats dateOfBirth as exact YYYY-MM-DD using UTC calendar components, never a local-time conversion', async () => {
+      prisma.person.findFirst.mockResolvedValue(buildPersonRow({ dateOfBirth: new Date(Date.UTC(2001, 0, 5)) }));
+      prisma.personTag.findMany.mockResolvedValue([]);
+      prisma.personJourneyHistory.findFirst.mockResolvedValue(null);
+
+      const result = await service.detail(ORG_ID, 'person-1');
+
+      expect(result.person.dateOfBirth).toBe('2001-01-05');
+    });
+
+    it('maps address through unchanged', async () => {
+      prisma.person.findFirst.mockResolvedValue(buildPersonRow({ address: '10 Downing Street' }));
+      prisma.personTag.findMany.mockResolvedValue([]);
+      prisma.personJourneyHistory.findFirst.mockResolvedValue(null);
+
+      const result = await service.detail(ORG_ID, 'person-1');
+
+      expect(result.person.address).toBe('10 Downing Street');
+    });
+
+    it('preserves null for gender, dateOfBirth, and address when unset', async () => {
+      prisma.person.findFirst.mockResolvedValue(buildPersonRow({ gender: null, dateOfBirth: null, address: null }));
+      prisma.personTag.findMany.mockResolvedValue([]);
+      prisma.personJourneyHistory.findFirst.mockResolvedValue(null);
+
+      const result = await service.detail(ORG_ID, 'person-1');
+
+      expect(result.person.gender).toBeNull();
+      expect(result.person.dateOfBirth).toBeNull();
+      expect(result.person.address).toBeNull();
+    });
+
+    it('requests gender, dateOfBirth, and address in the Prisma select (Detail-only, never the shared list/create/update select)', async () => {
+      prisma.person.findFirst.mockResolvedValue(buildPersonRow());
+      prisma.personTag.findMany.mockResolvedValue([]);
+      prisma.personJourneyHistory.findFirst.mockResolvedValue(null);
+
+      await service.detail(ORG_ID, 'person-1');
+
+      const args = prisma.person.findFirst.mock.calls[0][0];
+      expect(args.select).toMatchObject({ gender: true, dateOfBirth: true, address: true });
     });
   });
 
@@ -773,6 +831,18 @@ describe('PeopleService', () => {
 
       expect(result.person.firstName).toBe('Updated');
       expect(result.person).not.toHaveProperty('tags');
+    });
+
+    it('never widens to the Detail-only gender/dateOfBirth/address/currentJourneyStage fields (Product Task 039 boundary)', async () => {
+      prisma.person.findFirst.mockResolvedValue({ id: 'person-1' });
+      prisma.person.update.mockResolvedValue(buildPersonRow({ firstName: 'Updated' }));
+
+      const result = await service.update(ORG_ID, 'person-1', { firstName: 'Updated' } as never);
+
+      expect(result.person).not.toHaveProperty('gender');
+      expect(result.person).not.toHaveProperty('dateOfBirth');
+      expect(result.person).not.toHaveProperty('address');
+      expect(result.person).not.toHaveProperty('currentJourneyStage');
     });
   });
 
