@@ -5,6 +5,7 @@ import '../features/auth/auth_api.dart';
 import '../features/auth/auth_session_controller.dart';
 import '../features/dashboard/dashboard_api.dart';
 import '../features/organizations/organizations_api.dart';
+import '../features/people/people_api.dart';
 import 'api/api_client.dart';
 import 'storage/app_preferences.dart';
 import 'storage/secure_token_storage.dart';
@@ -30,3 +31,5 @@ final authApiProvider = Provider<AuthApi>((ref) => AuthApi(ref.watch(dioProvider
 final organizationsApiProvider = Provider<OrganizationsApi>((ref) => OrganizationsApi(ref.watch(dioProvider)));
 
 final dashboardApiProvider = Provider<DashboardApi>((ref) => DashboardApi(ref.watch(dioProvider)));
+
+final peopleApiProvider = Provider<PeopleApi>((ref) => PeopleApi(ref.watch(dioProvider)));
