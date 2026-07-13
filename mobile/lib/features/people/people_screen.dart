@@ -248,9 +248,9 @@ class _StatusFilterRow extends StatelessWidget {
   }
 }
 
-/// Non-interactive: no onTap/InkWell/GestureDetector. Person Profile
-/// navigation remains a later, separately-authorized slice (Product Task
-/// 034 §12); this row never pushes a route.
+/// Tapping the row navigates to Person Profile (Product Task 041 §A: the
+/// entry gesture itself, not a new visible affordance — no chevron/icon/
+/// menu item is added, so the visible card composition is unchanged).
 class _PersonRow extends StatelessWidget {
   const _PersonRow({required this.person});
 
@@ -263,47 +263,54 @@ class _PersonRow extends StatelessWidget {
     final stage = person.currentJourneyStage;
     final lastAttendance = person.lastAttendance;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-      decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.borderSubtle))),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          _PersonAvatar(person: person),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Wrap(
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  spacing: 8,
-                  runSpacing: 4,
-                  children: [
-                    Text(
-                      person.displayName,
-                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: AppColors.textPrimary),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (stage != null) _JourneyStageBadge(stage: stage),
+    return InkWell(
+      onTap: () => context.push('/people/${person.id}'),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.borderSubtle))),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            _PersonAvatar(person: person),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                      Text(
+                        person.displayName,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 15,
+                          color: AppColors.textPrimary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (stage != null) _JourneyStageBadge(stage: stage),
+                    ],
+                  ),
+                  if (phone != null && phone.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    _ContactRow(icon: Icons.phone_outlined, text: phone),
                   ],
-                ),
-                if (phone != null && phone.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  _ContactRow(icon: Icons.phone_outlined, text: phone),
+                  if (email != null && email.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    _ContactRow(icon: Icons.mail_outline, text: email),
+                  ],
                 ],
-                if (email != null && email.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  _ContactRow(icon: Icons.mail_outline, text: email),
-                ],
-              ],
+              ),
             ),
-          ),
-          if (lastAttendance != null) ...[
-            const SizedBox(width: 12),
-            _LastAttendanceBlock(checkedInAt: lastAttendance.checkedInAt),
+            if (lastAttendance != null) ...[
+              const SizedBox(width: 12),
+              _LastAttendanceBlock(checkedInAt: lastAttendance.checkedInAt),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

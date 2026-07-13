@@ -45,6 +45,56 @@ enum PersonGender {
         return 'FEMALE';
     }
   }
+
+  /// Detail-only (Product Task 041): gender is now read back by Person
+  /// Detail (Product Task 039), so unlike toApiValue (write-only, used only
+  /// by Add Person), this parses a real response value. Canonical values
+  /// are exactly MALE/FEMALE — there is no OTHER authority to parse.
+  static PersonGender fromApiValue(String value) {
+    switch (value) {
+      case 'MALE':
+        return PersonGender.male;
+      case 'FEMALE':
+        return PersonGender.female;
+      default:
+        throw ArgumentError('Unknown Person.gender value: $value');
+    }
+  }
+
+  String get displayLabel {
+    switch (this) {
+      case PersonGender.male:
+        return 'Male';
+      case PersonGender.female:
+        return 'Female';
+    }
+  }
+}
+
+/// Parses an approved date-only YYYY-MM-DD response value (Person Detail's
+/// dateOfBirth) into a UTC-midnight DateTime, mirroring the backend's own
+/// date-of-birth.validator.ts storage convention. Deliberately never routed
+/// through DateTime.parse's local-time interpretation or any
+/// .toLocal()/.toUtc() conversion, so the calendar date can never shift due
+/// to device timezone. Callers must read .year/.month/.day directly (never
+/// call .toLocal() on the result) to preserve this guarantee.
+DateTime parseDateOnly(String value) {
+  final parts = value.split('-');
+  return DateTime.utc(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
+}
+
+/// Detail-only (Product Task 039): a Tag as returned by Person Detail's
+/// read-only `tags` field. Not part of the approved Person Profile frozen
+/// composition (Task 038 §8), so not currently rendered anywhere, but
+/// modeled here because Person Detail's real response contract includes it.
+class PersonTag {
+  const PersonTag({required this.id, required this.name});
+
+  final String id;
+  final String name;
+
+  factory PersonTag.fromJson(Map<String, dynamic> json) =>
+      PersonTag(id: json['id'] as String, name: json['name'] as String);
 }
 
 /// List-only (Product Task 035): {id, name}. Never returned by Create, so
@@ -147,5 +197,173 @@ class PeoplePage {
         .map((person) => PersonSummary.fromJson(person as Map<String, dynamic>))
         .toList(),
     nextCursor: json['nextCursor'] as String?,
+  );
+}
+
+/// Mirrors the real, implemented GET
+/// /organizations/:organizationId/people/:personId response exactly
+/// (Product Task 039's read-contract widening): {id, firstName, lastName,
+/// email, phone, status, avatarUrl, joinedAt, tags, currentJourneyStage,
+/// gender, dateOfBirth, address}. This is Detail-only authority — deliberately
+/// a separate class from PersonSummary/PersonListSummary, never constructed
+/// from a List response, so PersonSummary is never mistaken for Detail
+/// authority anywhere in the app.
+class PersonDetail {
+  const PersonDetail({
+    required this.id,
+    required this.firstName,
+    required this.lastName,
+    required this.email,
+    required this.phone,
+    required this.status,
+    required this.avatarUrl,
+    required this.joinedAt,
+    required this.tags,
+    required this.currentJourneyStage,
+    required this.gender,
+    required this.dateOfBirth,
+    required this.address,
+  });
+
+  final String id;
+  final String firstName;
+  final String lastName;
+  final String? email;
+  final String? phone;
+  final PersonStatus status;
+  final String? avatarUrl;
+  final DateTime joinedAt;
+  final List<PersonTag> tags;
+  final JourneyStageSummary? currentJourneyStage;
+  final PersonGender? gender;
+
+  /// Date-only semantic (never a timestamp). Always UTC-midnight — see
+  /// parseDateOnly. Read .year/.month/.day directly; never call .toLocal().
+  final DateTime? dateOfBirth;
+  final String? address;
+
+  String get displayName => '$firstName $lastName'.trim();
+
+  String get initials {
+    final first = firstName.trim().isNotEmpty ? firstName.trim()[0] : '';
+    final last = lastName.trim().isNotEmpty ? lastName.trim()[0] : '';
+    return ('$first$last').toUpperCase();
+  }
+
+  factory PersonDetail.fromJson(Map<String, dynamic> json) => PersonDetail(
+    id: json['id'] as String,
+    firstName: json['firstName'] as String,
+    lastName: json['lastName'] as String,
+    email: json['email'] as String?,
+    phone: json['phone'] as String?,
+    status: PersonStatus.fromApiValue(json['status'] as String),
+    avatarUrl: json['avatarUrl'] as String?,
+    joinedAt: DateTime.parse(json['joinedAt'] as String),
+    tags: (json['tags'] as List<dynamic>)
+        .map((tag) => PersonTag.fromJson(tag as Map<String, dynamic>))
+        .toList(),
+    currentJourneyStage: json['currentJourneyStage'] != null
+        ? JourneyStageSummary.fromJson(json['currentJourneyStage'] as Map<String, dynamic>)
+        : null,
+    gender: json['gender'] != null ? PersonGender.fromApiValue(json['gender'] as String) : null,
+    dateOfBirth: json['dateOfBirth'] != null ? parseDateOnly(json['dateOfBirth'] as String) : null,
+    address: json['address'] as String?,
+  );
+}
+
+/// Mirrors the real, implemented GET
+/// /organizations/:organizationId/people/:personId/journey response's
+/// currentJourneyStage field exactly: {id, name, position}. position is the
+/// only field this shallow (Detail-level) currentJourneyStage lacks — it is
+/// the reason Person Profile calls this dedicated Journey endpoint rather
+/// than relying on Person Detail's own currentJourneyStage alone (Task 038
+/// §10: Person Detail alone is not enough for the frozen Journey region).
+class PersonJourneyCurrentStage {
+  const PersonJourneyCurrentStage({required this.id, required this.name, required this.position});
+
+  final String id;
+  final String name;
+  final int position;
+
+  factory PersonJourneyCurrentStage.fromJson(Map<String, dynamic> json) => PersonJourneyCurrentStage(
+    id: json['id'] as String,
+    name: json['name'] as String,
+    position: json['position'] as int,
+  );
+}
+
+/// Narrow projection of one GET .../journey history entry: only the two
+/// fields (toStage.id, movedAt) needed to derive, per real stage, the most
+/// recent instant it was moved into (see PersonProfileController's stepper
+/// date derivation). fromStage/note/movedBy are real, approved response
+/// fields but are not required by this first Profile slice's stepper, so
+/// they are intentionally not modeled here.
+class PersonJourneyHistoryEntry {
+  const PersonJourneyHistoryEntry({required this.toStageId, required this.movedAt});
+
+  final String toStageId;
+  final DateTime movedAt;
+
+  factory PersonJourneyHistoryEntry.fromJson(Map<String, dynamic> json) => PersonJourneyHistoryEntry(
+    toStageId: (json['toStage'] as Map<String, dynamic>)['id'] as String,
+    movedAt: DateTime.parse(json['movedAt'] as String),
+  );
+}
+
+/// Mirrors the real, implemented GET
+/// /organizations/:organizationId/people/:personId/journey response shape:
+/// {currentJourneyStage, history}. currentStage is null exactly when the
+/// Person has no journey history yet.
+class PersonJourneyView {
+  const PersonJourneyView({required this.currentStage, required this.history});
+
+  final PersonJourneyCurrentStage? currentStage;
+  final List<PersonJourneyHistoryEntry> history;
+
+  factory PersonJourneyView.fromJson(Map<String, dynamic> json) => PersonJourneyView(
+    currentStage: json['currentJourneyStage'] != null
+        ? PersonJourneyCurrentStage.fromJson(json['currentJourneyStage'] as Map<String, dynamic>)
+        : null,
+    history: (json['history'] as List<dynamic>)
+        .map((entry) => PersonJourneyHistoryEntry.fromJson(entry as Map<String, dynamic>))
+        .toList(),
+  );
+}
+
+/// One entry of the real, implemented GET
+/// /organizations/:organizationId/journey-stages response's ordered `stages`
+/// list: {id, name, position}. name is the organization's own configured
+/// stage label — never a fixed/illustrative reference set. Ordering
+/// authority (position ascending, then id ascending) belongs to the
+/// backend; this model does not re-sort — callers must trust response order.
+class JourneyStageListEntry {
+  const JourneyStageListEntry({required this.id, required this.name, required this.position});
+
+  final String id;
+  final String name;
+  final int position;
+
+  factory JourneyStageListEntry.fromJson(Map<String, dynamic> json) => JourneyStageListEntry(
+    id: json['id'] as String,
+    name: json['name'] as String,
+    position: json['position'] as int,
+  );
+}
+
+/// Mirrors the real, implemented GET
+/// /organizations/:organizationId/people/:personId/attendance/summary
+/// response's attendanceSummary object exactly: {totalCount,
+/// currentMonthCount}. No latestAttendance, history, percentage, streak, or
+/// trend field exists here — none of those are part of this endpoint's
+/// approved contract.
+class AttendanceSummary {
+  const AttendanceSummary({required this.totalCount, required this.currentMonthCount});
+
+  final int totalCount;
+  final int currentMonthCount;
+
+  factory AttendanceSummary.fromJson(Map<String, dynamic> json) => AttendanceSummary(
+    totalCount: json['totalCount'] as int,
+    currentMonthCount: json['currentMonthCount'] as int,
   );
 }

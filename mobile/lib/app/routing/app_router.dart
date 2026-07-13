@@ -11,6 +11,7 @@ import '../../features/organizations/organization_context_controller.dart';
 import '../../features/organizations/organization_setup_screen.dart';
 import '../../features/people/add_person_screen.dart';
 import '../../features/people/people_screen.dart';
+import '../../features/people/person_profile_screen.dart';
 import '../../features/workspace/workspace_screen.dart';
 import '../splash_screen.dart';
 import 'primary_navigation_shell.dart';
@@ -85,6 +86,16 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       // bottom navigation is not visible on this screen, matching the
       // frozen Add Person reference.
       GoRoute(path: '/people/add', builder: (context, state) => const AddPersonScreen()),
+      // Declared after the static '/people/add' route above (list order
+      // determines match precedence for sibling routes), so an 'add' path
+      // segment is never captured as a personId. Pushed above the shell —
+      // personId only, no organizationId and no whole-Person object — per
+      // the frozen Person Profile reference's own back-affordance/no-bottom-
+      // nav composition.
+      GoRoute(
+        path: '/people/:personId',
+        builder: (context, state) => PersonProfileScreen(personId: state.pathParameters['personId']!),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) => PrimaryNavigationShell(navigationShell: navigationShell),
         branches: [

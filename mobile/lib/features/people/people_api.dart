@@ -83,4 +83,45 @@ class PeopleApi {
     final data = unwrapEnvelope(response) as Map<String, dynamic>;
     return PersonSummary.fromJson(data['person'] as Map<String, dynamic>);
   }
+
+  /// Integrates the real, implemented GET
+  /// /organizations/:organizationId/people/:personId endpoint (Product Task
+  /// 039's widened read contract). This is the only place PersonDetail is
+  /// ever constructed — PersonSummary/List responses are never substituted.
+  Future<PersonDetail> detail({required String organizationId, required String personId}) async {
+    final response = await _dio.get<dynamic>('/organizations/$organizationId/people/$personId');
+    final data = unwrapEnvelope(response) as Map<String, dynamic>;
+    return PersonDetail.fromJson(data['person'] as Map<String, dynamic>);
+  }
+
+  /// Integrates the real, implemented GET
+  /// /organizations/:organizationId/people/:personId/journey endpoint.
+  Future<PersonJourneyView> journey({required String organizationId, required String personId}) async {
+    final response = await _dio.get<dynamic>('/organizations/$organizationId/people/$personId/journey');
+    final data = unwrapEnvelope(response) as Map<String, dynamic>;
+    return PersonJourneyView.fromJson(data);
+  }
+
+  /// Integrates the real, implemented GET
+  /// /organizations/:organizationId/journey-stages endpoint. Preserves
+  /// response order (position ascending, then id ascending) — never re-sorts.
+  Future<List<JourneyStageListEntry>> journeyStages({required String organizationId}) async {
+    final response = await _dio.get<dynamic>('/organizations/$organizationId/journey-stages');
+    final data = unwrapEnvelope(response) as Map<String, dynamic>;
+    return (data['stages'] as List<dynamic>)
+        .map((stage) => JourneyStageListEntry.fromJson(stage as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Integrates the real, implemented GET
+  /// /organizations/:organizationId/people/:personId/attendance/summary
+  /// endpoint (Product Task 039). Never substitutes People List's
+  /// lastAttendance or paginates Person Attendance history to compute counts.
+  Future<AttendanceSummary> attendanceSummary({required String organizationId, required String personId}) async {
+    final response = await _dio.get<dynamic>(
+      '/organizations/$organizationId/people/$personId/attendance/summary',
+    );
+    final data = unwrapEnvelope(response) as Map<String, dynamic>;
+    return AttendanceSummary.fromJson(data['attendanceSummary'] as Map<String, dynamic>);
+  }
 }

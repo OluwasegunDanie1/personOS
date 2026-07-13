@@ -70,6 +70,11 @@ Widget _wrap(PeoplePage page) {
     routes: [
       GoRoute(path: '/people', builder: (context, state) => const PeopleScreen()),
       GoRoute(path: '/people/add', builder: (context, state) => const Scaffold(body: Text('Add Person Screen'))),
+      GoRoute(
+        path: '/people/:personId',
+        builder: (context, state) =>
+            Scaffold(body: Text('Person Profile Screen: ${state.pathParameters['personId']}')),
+      ),
     ],
   );
 
@@ -126,7 +131,14 @@ void main() {
 
     await tester.tap(find.text('Ada Lovelace'));
     await tester.pumpAndSettle();
-    expect(find.text('People'), findsOneWidget, reason: 'tapping a row must not navigate anywhere yet');
+    expect(
+      find.text('Person Profile Screen: p1'),
+      findsOneWidget,
+      reason: 'tapping a row must navigate to /people/:personId (Product Task 041)',
+    );
+
+    GoRouter.of(tester.element(find.text('Person Profile Screen: p1'))).pop();
+    await tester.pumpAndSettle();
 
     // Floating (bottom-right, above bottom nav), not full-width: an
     // extended FAB with a person-add icon and "Add Person" label.
@@ -350,18 +362,22 @@ void main() {
       expect(tester.takeException(), isNull);
     });
 
-    testWidgets('no trailing three-dot icon renders, and the card does not navigate on tap', (
+    testWidgets('no trailing three-dot icon renders, and tapping the card navigates to /people/:personId', (
       WidgetTester tester,
     ) async {
       await tester.pumpWidget(_wrap(_wrapPage([_person(id: 'p1', firstName: 'Ada', lastName: 'Lovelace')])));
       await tester.pumpAndSettle();
 
-      expect(find.byIcon(Icons.more_vert), findsNothing);
+      expect(find.byIcon(Icons.more_vert), findsNothing, reason: 'no chevron/menu affordance is added to the card');
 
       await tester.tap(find.text('Ada Lovelace'));
       await tester.pumpAndSettle();
 
-      expect(find.text('People'), findsOneWidget, reason: 'the card must not push /people/:id or any route');
+      expect(
+        find.text('Person Profile Screen: p1'),
+        findsOneWidget,
+        reason: 'the card must push /people/:personId (Product Task 041)',
+      );
     });
   });
 }

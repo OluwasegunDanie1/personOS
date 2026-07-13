@@ -625,4 +625,272 @@ void main() {
       expect(body.keys, {'firstName', 'lastName', 'status'});
     });
   });
+
+  group('PersonDetail parsing (Product Task 041)', () {
+    Map<String, dynamic> detailPersonJson({Map<String, dynamic> overrides = const {}}) => {
+      'id': 'p1',
+      'firstName': 'Ada',
+      'lastName': 'Lovelace',
+      'email': 'ada@example.com',
+      'phone': '+1234567890',
+      'status': 'ACTIVE',
+      'avatarUrl': null,
+      'joinedAt': '2026-01-01T00:00:00.000Z',
+      'tags': [
+        {'id': 'tag-1', 'name': 'VIP'},
+      ],
+      'currentJourneyStage': {'id': 'stage-1', 'name': 'Visitor'},
+      'gender': 'FEMALE',
+      'dateOfBirth': '1990-12-31',
+      'address': '221B Baker Street',
+      ...overrides,
+    };
+
+    test('parses every field of a fully-populated Person Detail response', () async {
+      final adapter = _FakeAdapter(
+        (options) async => _jsonBody({
+          'success': true,
+          'data': {'person': detailPersonJson()},
+        }, 200),
+      );
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      final person = await PeopleApi(dio).detail(organizationId: 'org-1', personId: 'p1');
+
+      expect(person.id, 'p1');
+      expect(person.displayName, 'Ada Lovelace');
+      expect(person.email, 'ada@example.com');
+      expect(person.phone, '+1234567890');
+      expect(person.status, PersonStatus.active);
+      expect(person.avatarUrl, isNull);
+      expect(person.joinedAt, DateTime.parse('2026-01-01T00:00:00.000Z'));
+      expect(person.tags, hasLength(1));
+      expect(person.tags.single.id, 'tag-1');
+      expect(person.tags.single.name, 'VIP');
+      expect(person.currentJourneyStage!.id, 'stage-1');
+      expect(person.currentJourneyStage!.name, 'Visitor');
+      expect(person.gender, PersonGender.female);
+      expect(person.address, '221B Baker Street');
+      expect(adapter.lastRequest!.path, '/organizations/org-1/people/p1');
+    });
+
+    test('preserves nullable gender/dateOfBirth/address/currentJourneyStage/avatarUrl as null', () async {
+      final adapter = _FakeAdapter(
+        (options) async => _jsonBody({
+          'success': true,
+          'data': {
+            'person': detailPersonJson(
+              overrides: {
+                'gender': null,
+                'dateOfBirth': null,
+                'address': null,
+                'currentJourneyStage': null,
+                'avatarUrl': null,
+                'tags': [],
+              },
+            ),
+          },
+        }, 200),
+      );
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      final person = await PeopleApi(dio).detail(organizationId: 'org-1', personId: 'p1');
+
+      expect(person.gender, isNull);
+      expect(person.dateOfBirth, isNull);
+      expect(person.address, isNull);
+      expect(person.currentJourneyStage, isNull);
+      expect(person.avatarUrl, isNull);
+      expect(person.tags, isEmpty);
+    });
+
+    test('preserves the exact calendar date for dateOfBirth regardless of device-local timezone', () async {
+      final adapter = _FakeAdapter(
+        (options) async => _jsonBody({
+          'success': true,
+          'data': {
+            'person': detailPersonJson(overrides: {'dateOfBirth': '1990-12-31'}),
+          },
+        }, 200),
+      );
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      final person = await PeopleApi(dio).detail(organizationId: 'org-1', personId: 'p1');
+
+      expect(person.dateOfBirth!.year, 1990);
+      expect(person.dateOfBirth!.month, 12);
+      expect(person.dateOfBirth!.day, 31);
+      expect(person.dateOfBirth!.isUtc, isTrue, reason: 'must never be parsed as a local-time timestamp');
+    });
+
+    test('a missing required field throws (existing model parsing convention: direct "as" casts)', () async {
+      final adapter = _FakeAdapter(
+        (options) async => _jsonBody({
+          'success': true,
+          'data': {
+            'person': detailPersonJson()..remove('id'),
+          },
+        }, 200),
+      );
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await expectLater(PeopleApi(dio).detail(organizationId: 'org-1', personId: 'p1'), throwsA(isA<TypeError>()));
+    });
+  });
+
+  group('PersonJourneyView parsing', () {
+    test('parses a non-null currentStage with position and a non-empty history', () async {
+      final adapter = _FakeAdapter(
+        (options) async => _jsonBody({
+          'success': true,
+          'data': {
+            'currentJourneyStage': {'id': 'stage-2', 'name': 'First Visit', 'position': 2},
+            'history': [
+              {
+                'id': 'h1',
+                'fromStage': {'id': 'stage-1', 'name': 'Visitor'},
+                'toStage': {'id': 'stage-2', 'name': 'First Visit'},
+                'note': null,
+                'movedAt': '2026-04-12T10:00:00.000Z',
+                'movedBy': {'id': 'user-1', 'firstName': 'Grace', 'lastName': 'Hopper'},
+              },
+            ],
+          },
+        }, 200),
+      );
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      final journey = await PeopleApi(dio).journey(organizationId: 'org-1', personId: 'p1');
+
+      expect(journey.currentStage!.id, 'stage-2');
+      expect(journey.currentStage!.name, 'First Visit');
+      expect(journey.currentStage!.position, 2);
+      expect(journey.history, hasLength(1));
+      expect(journey.history.single.toStageId, 'stage-2');
+      expect(journey.history.single.movedAt, DateTime.parse('2026-04-12T10:00:00.000Z'));
+      expect(adapter.lastRequest!.path, '/organizations/org-1/people/p1/journey');
+    });
+
+    test('a null currentJourneyStage and empty history parse without error', () async {
+      final adapter = _FakeAdapter(
+        (options) async => _jsonBody({
+          'success': true,
+          'data': {'currentJourneyStage': null, 'history': []},
+        }, 200),
+      );
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      final journey = await PeopleApi(dio).journey(organizationId: 'org-1', personId: 'p1');
+
+      expect(journey.currentStage, isNull);
+      expect(journey.history, isEmpty);
+    });
+
+    test('a missing required history field throws', () async {
+      final adapter = _FakeAdapter(
+        (options) async => _jsonBody({
+          'success': true,
+          'data': {'currentJourneyStage': null, 'history': null},
+        }, 200),
+      );
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await expectLater(
+        PeopleApi(dio).journey(organizationId: 'org-1', personId: 'p1'),
+        throwsA(isA<TypeError>()),
+      );
+    });
+  });
+
+  group('JourneyStageListEntry parsing (ordered Journey Stages)', () {
+    test('preserves the exact response order of a real organization-configured stage list', () async {
+      final adapter = _FakeAdapter(
+        (options) async => _jsonBody({
+          'success': true,
+          'data': {
+            'stages': [
+              {'id': 's1', 'name': 'Visitor', 'position': 1},
+              {'id': 's2', 'name': 'First Visit', 'position': 2},
+              {'id': 's3', 'name': 'Member', 'position': 3},
+            ],
+          },
+        }, 200),
+      );
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      final stages = await PeopleApi(dio).journeyStages(organizationId: 'org-1');
+
+      expect(stages.map((s) => s.name).toList(), ['Visitor', 'First Visit', 'Member']);
+      expect(stages.map((s) => s.position).toList(), [1, 2, 3]);
+      expect(adapter.lastRequest!.path, '/organizations/org-1/journey-stages');
+    });
+
+    test('an empty stage list parses without error (no hardcoded fallback stages)', () async {
+      final adapter = _FakeAdapter(
+        (options) async => _jsonBody({
+          'success': true,
+          'data': {'stages': []},
+        }, 200),
+      );
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      final stages = await PeopleApi(dio).journeyStages(organizationId: 'org-1');
+
+      expect(stages, isEmpty);
+    });
+  });
+
+  group('AttendanceSummary parsing', () {
+    test('parses totalCount and currentMonthCount exactly', () async {
+      final adapter = _FakeAdapter(
+        (options) async => _jsonBody({
+          'success': true,
+          'data': {
+            'attendanceSummary': {'totalCount': 24, 'currentMonthCount': 6},
+          },
+        }, 200),
+      );
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      final summary = await PeopleApi(dio).attendanceSummary(organizationId: 'org-1', personId: 'p1');
+
+      expect(summary.totalCount, 24);
+      expect(summary.currentMonthCount, 6);
+      expect(adapter.lastRequest!.path, '/organizations/org-1/people/p1/attendance/summary');
+    });
+
+    test('zero counts parse correctly (not mistaken for a missing/null field)', () async {
+      final adapter = _FakeAdapter(
+        (options) async => _jsonBody({
+          'success': true,
+          'data': {
+            'attendanceSummary': {'totalCount': 0, 'currentMonthCount': 0},
+          },
+        }, 200),
+      );
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      final summary = await PeopleApi(dio).attendanceSummary(organizationId: 'org-1', personId: 'p1');
+
+      expect(summary.totalCount, 0);
+      expect(summary.currentMonthCount, 0);
+    });
+
+    test('a missing required field throws', () async {
+      final adapter = _FakeAdapter(
+        (options) async => _jsonBody({
+          'success': true,
+          'data': {
+            'attendanceSummary': {'currentMonthCount': 6},
+          },
+        }, 200),
+      );
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await expectLater(
+        PeopleApi(dio).attendanceSummary(organizationId: 'org-1', personId: 'p1'),
+        throwsA(isA<TypeError>()),
+      );
+    });
+  });
 }
