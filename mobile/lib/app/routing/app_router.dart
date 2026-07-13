@@ -9,6 +9,7 @@ import '../../features/events/events_screen.dart';
 import '../../features/messages/messages_screen.dart';
 import '../../features/organizations/organization_context_controller.dart';
 import '../../features/organizations/organization_setup_screen.dart';
+import '../../features/people/add_person_screen.dart';
 import '../../features/people/people_screen.dart';
 import '../../features/workspace/workspace_screen.dart';
 import '../splash_screen.dart';
@@ -80,6 +81,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(path: splashPath, builder: (context, state) => const SplashScreen()),
       GoRoute(path: signInPath, builder: (context, state) => const SignInScreen()),
       GoRoute(path: organizationSetupPath, builder: (context, state) => const OrganizationSetupScreen()),
+      // Pushed above the shell (not a StatefulShellBranch), so the primary
+      // bottom navigation is not visible on this screen, matching the
+      // frozen Add Person reference.
+      GoRoute(path: '/people/add', builder: (context, state) => const AddPersonScreen()),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) => PrimaryNavigationShell(navigationShell: navigationShell),
         branches: [

@@ -319,22 +319,47 @@ void main() {
 
   test('a stale older-search response cannot overwrite a newer search result', () async {
     final staleGate = Completer<PeoplePage>();
+    // Deterministic request-entry signals: completed synchronously by the
+    // fake handler the instant the real (350ms) production debounce fires
+    // and the matching search actually reaches PeopleApi.list() — however
+    // long that genuinely takes on this machine under this run's load.
+    // This replaces guessing a fixed wall-clock duration (the previous
+    // 400ms-vs-350ms race) with awaiting the exact event the test depends
+    // on, while still exercising the real updateSearch()/debounce path.
+    final aEntered = Completer<void>();
+    final abEntered = Completer<void>();
 
     buildContainer(OrganizationContextActive(organizations: [_orgSummary('org-a')], selectedOrganizationId: 'org-a'), (
       {required organizationId, cursor, search, status, limit}) {
-      if (search == 'a') return staleGate.future;
+      if (search == 'a') {
+        if (!aEntered.isCompleted) aEntered.complete();
+        return staleGate.future;
+      }
+      if (search == 'ab' && !abEntered.isCompleted) {
+        abEntered.complete();
+      }
       return _immediate([_person('result-for-$search')]);
     });
     await Future<void>.delayed(Duration.zero);
 
     final notifier = container.read(peopleDirectoryControllerProvider.notifier);
+
     notifier.updateSearch('a');
-    await Future<void>.delayed(const Duration(milliseconds: 400));
+    await aEntered.future;
+    expect(staleGate.isCompleted, isFalse, reason: 'the search=a response must still be unresolved at this point');
 
     notifier.updateSearch('ab');
-    await Future<void>.delayed(const Duration(milliseconds: 400));
+    await abEntered.future;
+    // abEntered proves search=ab reached PeopleApi.list(); one deterministic
+    // microtask flush lets the already-scheduled immediate response and the
+    // controller's subsequent state assignment actually run before assertion.
+    await Future<void>.delayed(Duration.zero);
 
-    expect(container.read(peopleDirectoryControllerProvider).people.single.id, 'result-for-ab');
+    expect(
+      container.read(peopleDirectoryControllerProvider).people.single.id,
+      'result-for-ab',
+      reason: 'the newer search=ab result must be authoritative before the stale search=a response is released',
+    );
 
     staleGate.complete(PeoplePage(people: [_person('result-for-a')], nextCursor: null));
     await Future<void>.delayed(Duration.zero);

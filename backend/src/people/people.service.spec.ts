@@ -29,8 +29,12 @@ function createMockPrisma() {
     },
     personTag: { findMany: jest.fn() },
     personJourneyHistory: { findFirst: jest.fn() },
-    journeyStage: { findFirst: jest.fn() },
-    $queryRaw: jest.fn(),
+    journeyStage: { findFirst: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
+    // Default: no journey/attendance enrichment data. Individual tests
+    // override with mockResolvedValueOnce for the specific batch call(s)
+    // they care about (journey batch is always called before attendance
+    // batch within a single list() invocation — see Promise.all ordering).
+    $queryRaw: jest.fn().mockResolvedValue([]),
   };
 }
 
@@ -224,10 +228,195 @@ describe('PeopleService', () => {
             status: 'ACTIVE',
             avatarUrl: 'https://x/y.png',
             joinedAt: '2026-01-01T00:00:00.000Z',
+            currentJourneyStage: null,
+            lastAttendance: null,
           },
         ],
         nextCursor: null,
       });
+    });
+
+    describe('current journey stage enrichment', () => {
+      it('is null when the person has no journey history', async () => {
+        prisma.person.findMany.mockResolvedValue([buildPersonRow({ id: 'person-1' })]);
+
+        const result = await service.list(ORG_ID, {} as never);
+
+        expect(result.people[0].currentJourneyStage).toBeNull();
+      });
+
+      it('returns exactly {id, name} when history exists', async () => {
+        prisma.person.findMany.mockResolvedValue([buildPersonRow({ id: 'person-1' })]);
+        prisma.$queryRaw
+          .mockResolvedValueOnce([{ person_id: 'person-1', to_stage_id: STAGE_ID }])
+          .mockResolvedValueOnce([]);
+        prisma.journeyStage.findMany.mockResolvedValue([{ id: STAGE_ID, name: 'Connected Guest' }]);
+
+        const result = await service.list(ORG_ID, {} as never);
+
+        expect(result.people[0].currentJourneyStage).toEqual({ id: STAGE_ID, name: 'Connected Guest' });
+        expect(Object.keys(result.people[0].currentJourneyStage as object).sort()).toEqual(['id', 'name']);
+      });
+
+      it('an organization-customized stage name is returned unchanged, with no hardcoded stage names in the mapping', async () => {
+        prisma.person.findMany.mockResolvedValue([buildPersonRow({ id: 'person-1' })]);
+        prisma.$queryRaw
+          .mockResolvedValueOnce([{ person_id: 'person-1', to_stage_id: STAGE_ID }])
+          .mockResolvedValueOnce([]);
+        prisma.journeyStage.findMany.mockResolvedValue([{ id: STAGE_ID, name: 'Somos Familia — Etapa 3' }]);
+
+        const result = await service.list(ORG_ID, {} as never);
+
+        expect(result.people[0].currentJourneyStage?.name).toBe('Somos Familia — Etapa 3');
+      });
+
+      it('constructs the batch query with DISTINCT ON and movedAt DESC, id DESC ordering (latest-wins / tie-break structure)', async () => {
+        prisma.person.findMany.mockResolvedValue([buildPersonRow({ id: 'person-1' })]);
+
+        await service.list(ORG_ID, {} as never);
+
+        const journeySql = (prisma.$queryRaw.mock.calls[0][0] as string[]).join('');
+        expect(journeySql).toContain('DISTINCT ON (h.person_id)');
+        expect(journeySql).toMatch(/ORDER BY h\.person_id, h\.moved_at DESC, h\.id DESC/);
+      });
+
+      it('scopes the batch query to the current organization and only the current-page person IDs', async () => {
+        prisma.person.findMany.mockResolvedValue([
+          buildPersonRow({ id: 'person-1' }),
+          buildPersonRow({ id: 'person-2' }),
+        ]);
+
+        await service.list(ORG_ID, { limit: 2 } as never);
+
+        const journeyCallArgs = prisma.$queryRaw.mock.calls[0];
+        expect(journeyCallArgs[1]).toBe(ORG_ID);
+        expect((journeyCallArgs[2] as { values: string[] }).values).toEqual(['person-1', 'person-2']);
+      });
+
+      it('a stage that does not belong to this organization cannot leak into the response', async () => {
+        prisma.person.findMany.mockResolvedValue([buildPersonRow({ id: 'person-1' })]);
+        prisma.$queryRaw
+          .mockResolvedValueOnce([{ person_id: 'person-1', to_stage_id: STAGE_ID }])
+          .mockResolvedValueOnce([]);
+        // Simulates the stage not resolving under this organization's own
+        // journeyTemplate — the re-validation step must then omit it.
+        prisma.journeyStage.findMany.mockResolvedValue([]);
+
+        const result = await service.list(ORG_ID, {} as never);
+
+        expect(result.people[0].currentJourneyStage).toBeNull();
+        const findManyArgs = prisma.journeyStage.findMany.mock.calls[0][0];
+        expect(findManyArgs.where.journeyTemplate).toEqual({ organizationId: ORG_ID });
+      });
+    });
+
+    describe('latest attendance enrichment', () => {
+      it('is null when no attendance exists', async () => {
+        prisma.person.findMany.mockResolvedValue([buildPersonRow({ id: 'person-1' })]);
+
+        const result = await service.list(ORG_ID, {} as never);
+
+        expect(result.people[0].lastAttendance).toBeNull();
+      });
+
+      it('returns exactly {checkedInAt} when attendance exists', async () => {
+        prisma.person.findMany.mockResolvedValue([buildPersonRow({ id: 'person-1' })]);
+        prisma.$queryRaw
+          .mockResolvedValueOnce([]) // journey batch
+          .mockResolvedValueOnce([{ person_id: 'person-1', checked_in_at: new Date('2026-05-25T09:00:00.000Z') }]);
+
+        const result = await service.list(ORG_ID, {} as never);
+
+        expect(result.people[0].lastAttendance).toEqual({ checkedInAt: '2026-05-25T09:00:00.000Z' });
+        expect(Object.keys(result.people[0].lastAttendance as object)).toEqual(['checkedInAt']);
+      });
+
+      it('constructs the batch query with DISTINCT ON and checkedInAt DESC, id DESC ordering (latest-wins / tie-break structure)', async () => {
+        prisma.person.findMany.mockResolvedValue([buildPersonRow({ id: 'person-1' })]);
+
+        await service.list(ORG_ID, {} as never);
+
+        const attendanceSql = (prisma.$queryRaw.mock.calls[1][0] as string[]).join('');
+        expect(attendanceSql).toContain('DISTINCT ON (person_id)');
+        expect(attendanceSql).toMatch(/ORDER BY person_id, checked_in_at DESC, id DESC/);
+      });
+
+      it('scopes the batch query to the current organization and only the current-page person IDs', async () => {
+        prisma.person.findMany.mockResolvedValue([
+          buildPersonRow({ id: 'person-1' }),
+          buildPersonRow({ id: 'person-2' }),
+        ]);
+
+        await service.list(ORG_ID, { limit: 2 } as never);
+
+        const attendanceCallArgs = prisma.$queryRaw.mock.calls[1];
+        expect(attendanceCallArgs[1]).toBe(ORG_ID);
+        expect((attendanceCallArgs[2] as { values: string[] }).values).toEqual(['person-1', 'person-2']);
+      });
+
+      it('never includes event detail, status, or the attendance id', async () => {
+        prisma.person.findMany.mockResolvedValue([buildPersonRow({ id: 'person-1' })]);
+        prisma.$queryRaw
+          .mockResolvedValueOnce([])
+          .mockResolvedValueOnce([{ person_id: 'person-1', checked_in_at: new Date('2026-05-25T09:00:00.000Z') }]);
+
+        const result = await service.list(ORG_ID, {} as never);
+
+        expect(result.people[0].lastAttendance).not.toHaveProperty('event');
+        expect(result.people[0].lastAttendance).not.toHaveProperty('status');
+        expect(result.people[0].lastAttendance).not.toHaveProperty('id');
+      });
+    });
+
+    it('does not run journey or attendance enrichment queries for an empty page', async () => {
+      prisma.person.findMany.mockResolvedValue([]);
+
+      const result = await service.list(ORG_ID, {} as never);
+
+      expect(result.people).toEqual([]);
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
+      expect(prisma.journeyStage.findMany).not.toHaveBeenCalled();
+    });
+
+    it('runs exactly one journey batch query and one attendance batch query regardless of page size (no per-person query loop)', async () => {
+      prisma.person.findMany.mockResolvedValue([
+        buildPersonRow({ id: 'person-1' }),
+        buildPersonRow({ id: 'person-2' }),
+        buildPersonRow({ id: 'person-3' }),
+        buildPersonRow({ id: 'person-4' }),
+        buildPersonRow({ id: 'person-5' }),
+      ]);
+
+      await service.list(ORG_ID, { limit: 5 } as never);
+
+      // Exactly two $queryRaw calls total for a 5-person page: one journey
+      // batch, one attendance batch — never one call per person (5 people
+      // would otherwise mean 5+ calls under an N+1 pattern).
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not leak another organization journey stage even when to_stage_id is present, by re-validating against journeyTemplate.organizationId', async () => {
+      prisma.person.findMany.mockResolvedValue([buildPersonRow({ id: 'person-1' })]);
+      const OTHER_STAGE_ID = '33333333-3333-3333-3333-333333333333';
+      prisma.$queryRaw
+        .mockResolvedValueOnce([{ person_id: 'person-1', to_stage_id: OTHER_STAGE_ID }])
+        .mockResolvedValueOnce([]);
+      prisma.journeyStage.findMany.mockResolvedValue([]);
+
+      const result = await service.list(ORG_ID, {} as never);
+
+      expect(result.people[0].currentJourneyStage).toBeNull();
+    });
+
+    it('does not add address, gender, dateOfBirth, or tags to the List response', async () => {
+      prisma.person.findMany.mockResolvedValue([buildPersonRow({ id: 'person-1' })]);
+
+      const result = await service.list(ORG_ID, {} as never);
+
+      expect(result.people[0]).not.toHaveProperty('address');
+      expect(result.people[0]).not.toHaveProperty('gender');
+      expect(result.people[0]).not.toHaveProperty('dateOfBirth');
+      expect(result.people[0]).not.toHaveProperty('tags');
     });
   });
 
@@ -298,6 +487,7 @@ describe('PeopleService', () => {
 
       expect(result.person).not.toHaveProperty('journeyHistory');
       expect(result.person).not.toHaveProperty('attendance');
+      expect(result.person).not.toHaveProperty('lastAttendance');
       expect(result.person).not.toHaveProperty('followUps');
       expect(result.person).not.toHaveProperty('notes');
     });
@@ -340,7 +530,115 @@ describe('PeopleService', () => {
         email: null,
         phone: null,
         status: 'ACTIVE',
+        gender: null,
+        dateOfBirth: null,
+        address: null,
       });
+    });
+
+    it('persists MALE exactly as MALE', async () => {
+      prisma.person.create.mockResolvedValue(buildPersonRow());
+
+      await service.create(ORG_ID, { firstName: 'Ada', lastName: 'Lovelace', gender: 'MALE' } as never);
+
+      const args = prisma.person.create.mock.calls[0][0];
+      expect(args.data.gender).toBe('MALE');
+    });
+
+    it('persists FEMALE exactly as FEMALE', async () => {
+      prisma.person.create.mockResolvedValue(buildPersonRow());
+
+      await service.create(ORG_ID, { firstName: 'Ada', lastName: 'Lovelace', gender: 'FEMALE' } as never);
+
+      const args = prisma.person.create.mock.calls[0][0];
+      expect(args.data.gender).toBe('FEMALE');
+    });
+
+    it('persists an omitted gender as null', async () => {
+      prisma.person.create.mockResolvedValue(buildPersonRow());
+
+      await service.create(ORG_ID, { firstName: 'Ada', lastName: 'Lovelace' } as never);
+
+      const args = prisma.person.create.mock.calls[0][0];
+      expect(args.data.gender).toBeNull();
+    });
+
+    it('persists a valid dateOfBirth without shifting the calendar day', async () => {
+      prisma.person.create.mockResolvedValue(buildPersonRow());
+
+      await service.create(ORG_ID, { firstName: 'Ada', lastName: 'Lovelace', dateOfBirth: '2001-07-14' } as never);
+
+      const args = prisma.person.create.mock.calls[0][0];
+      const persisted = args.data.dateOfBirth as Date;
+      expect(persisted.getUTCFullYear()).toBe(2001);
+      expect(persisted.getUTCMonth()).toBe(6);
+      expect(persisted.getUTCDate()).toBe(14);
+    });
+
+    it('persists a leap-day dateOfBirth correctly', async () => {
+      prisma.person.create.mockResolvedValue(buildPersonRow());
+
+      await service.create(ORG_ID, { firstName: 'Ada', lastName: 'Lovelace', dateOfBirth: '2000-02-29' } as never);
+
+      const args = prisma.person.create.mock.calls[0][0];
+      const persisted = args.data.dateOfBirth as Date;
+      expect(persisted.getUTCFullYear()).toBe(2000);
+      expect(persisted.getUTCMonth()).toBe(1);
+      expect(persisted.getUTCDate()).toBe(29);
+    });
+
+    it('persists an omitted dateOfBirth as null', async () => {
+      prisma.person.create.mockResolvedValue(buildPersonRow());
+
+      await service.create(ORG_ID, { firstName: 'Ada', lastName: 'Lovelace' } as never);
+
+      const args = prisma.person.create.mock.calls[0][0];
+      expect(args.data.dateOfBirth).toBeNull();
+    });
+
+    it('persists an already-normalized address value', async () => {
+      prisma.person.create.mockResolvedValue(buildPersonRow());
+
+      await service.create(ORG_ID, { firstName: 'Ada', lastName: 'Lovelace', address: '123 Main St' } as never);
+
+      const args = prisma.person.create.mock.calls[0][0];
+      expect(args.data.address).toBe('123 Main St');
+    });
+
+    it('persists an omitted address as null', async () => {
+      prisma.person.create.mockResolvedValue(buildPersonRow());
+
+      await service.create(ORG_ID, { firstName: 'Ada', lastName: 'Lovelace' } as never);
+
+      const args = prisma.person.create.mock.calls[0][0];
+      expect(args.data.address).toBeNull();
+    });
+
+    it('still constructs create data explicitly, never spreading the dto', async () => {
+      prisma.person.create.mockResolvedValue(buildPersonRow());
+
+      await service.create(ORG_ID, {
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        gender: 'FEMALE',
+        dateOfBirth: '2001-07-14',
+        address: '123 Main St',
+      } as never);
+
+      const args = prisma.person.create.mock.calls[0][0];
+      expect(Object.keys(args.data).sort()).toEqual(
+        [
+          'organizationId',
+          'firstName',
+          'lastName',
+          'email',
+          'phone',
+          'status',
+          'gender',
+          'dateOfBirth',
+          'address',
+        ].sort(),
+      );
     });
 
     it('does not perform any duplicate email/phone check', async () => {
@@ -378,6 +676,32 @@ describe('PeopleService', () => {
           joinedAt: '2026-01-01T00:00:00.000Z',
         },
       });
+    });
+
+    it('never echoes gender, dateOfBirth, or address in the create response, even when supplied', async () => {
+      prisma.person.create.mockResolvedValue(buildPersonRow({ id: 'person-new' }));
+
+      const result = await service.create(ORG_ID, {
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        gender: 'FEMALE',
+        dateOfBirth: '2001-07-14',
+        address: '123 Main St',
+      } as never);
+
+      expect(result.person).not.toHaveProperty('gender');
+      expect(result.person).not.toHaveProperty('dateOfBirth');
+      expect(result.person).not.toHaveProperty('address');
+    });
+
+    it('does not include currentJourneyStage or lastAttendance — those are List-only enrichment', async () => {
+      prisma.person.create.mockResolvedValue(buildPersonRow({ id: 'person-new' }));
+
+      const result = await service.create(ORG_ID, { firstName: 'Ada', lastName: 'Lovelace' } as never);
+
+      expect(result.person).not.toHaveProperty('currentJourneyStage');
+      expect(result.person).not.toHaveProperty('lastAttendance');
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
     });
   });
 

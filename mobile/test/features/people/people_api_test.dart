@@ -82,6 +82,89 @@ void main() {
 
       expect(person.initials, 'T');
     });
+
+    Map<String, dynamic> baseJson({Object? currentJourneyStage, Object? lastAttendance}) => {
+      'id': 'p1',
+      'firstName': 'Ada',
+      'lastName': 'Lovelace',
+      'email': null,
+      'phone': null,
+      'status': 'ACTIVE',
+      'avatarUrl': null,
+      'joinedAt': '2026-01-01T00:00:00.000Z',
+      'currentJourneyStage': currentJourneyStage,
+      'lastAttendance': lastAttendance,
+    };
+
+    test('currentJourneyStage is null when the key is absent', () {
+      final json = baseJson()..remove('currentJourneyStage');
+
+      final person = PersonSummary.fromJson(json);
+
+      expect(person.currentJourneyStage, isNull);
+    });
+
+    test('currentJourneyStage is null when explicitly null', () {
+      final person = PersonSummary.fromJson(baseJson(currentJourneyStage: null));
+
+      expect(person.currentJourneyStage, isNull);
+    });
+
+    test('currentJourneyStage parses exact id and name', () {
+      final person = PersonSummary.fromJson(
+        baseJson(currentJourneyStage: {'id': 'stage-1', 'name': 'Connected Guest'}),
+      );
+
+      expect(person.currentJourneyStage?.id, 'stage-1');
+      expect(person.currentJourneyStage?.name, 'Connected Guest');
+    });
+
+    test('an organization-configured stage name is preserved exactly, unmodified', () {
+      const rawName = 'somos FAMILIA — etapa 3';
+      final person = PersonSummary.fromJson(
+        baseJson(currentJourneyStage: {'id': 'stage-1', 'name': rawName}),
+      );
+
+      expect(person.currentJourneyStage?.name, rawName);
+    });
+
+    test('lastAttendance is null when the key is absent', () {
+      final json = baseJson()..remove('lastAttendance');
+
+      final person = PersonSummary.fromJson(json);
+
+      expect(person.lastAttendance, isNull);
+    });
+
+    test('lastAttendance is null when explicitly null', () {
+      final person = PersonSummary.fromJson(baseJson(lastAttendance: null));
+
+      expect(person.lastAttendance, isNull);
+    });
+
+    test('lastAttendance parses checkedInAt as a DateTime', () {
+      final person = PersonSummary.fromJson(
+        baseJson(lastAttendance: {'checkedInAt': '2026-05-25T09:00:00.000Z'}),
+      );
+
+      expect(person.lastAttendance?.checkedInAt, DateTime.parse('2026-05-25T09:00:00.000Z'));
+    });
+
+    test('a Create-response-shaped payload without either new field still parses successfully', () {
+      final person = PersonSummary.fromJson({
+        'id': 'p1',
+        'firstName': 'Ada',
+        'lastName': 'Lovelace',
+        'email': null,
+        'phone': null,
+        'status': 'ACTIVE',
+        'avatarUrl': null,
+        'joinedAt': '2026-01-01T00:00:00.000Z',
+      });
+
+      expect(person.currentJourneyStage, isNull);
+      expect(person.lastAttendance, isNull);
+    });
   });
 
   group('PeoplePage parsing', () {
@@ -215,6 +298,331 @@ void main() {
 
       expect(page.people.single.id, 'p1');
       expect(page.nextCursor, isNull);
+    });
+  });
+
+  group('PeopleApi.create request construction', () {
+    Map<String, dynamic> personResponse({String status = 'ACTIVE'}) => {
+      'success': true,
+      'data': {
+        'person': {
+          'id': 'p1',
+          'firstName': 'Ada',
+          'lastName': 'Lovelace',
+          'email': null,
+          'phone': null,
+          'status': status,
+          'avatarUrl': null,
+          'joinedAt': '2026-01-01T00:00:00.000Z',
+        },
+      },
+    };
+
+    test('posts to the organization-scoped People endpoint', () async {
+      final adapter = _FakeAdapter((options) async => _jsonBody(personResponse(), 201));
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await PeopleApi(
+        dio,
+      ).create(organizationId: 'org-1', firstName: 'Ada', lastName: 'Lovelace', status: PersonStatus.active);
+
+      expect(adapter.lastRequest!.path, '/organizations/org-1/people');
+      expect(adapter.lastRequest!.method, 'POST');
+    });
+
+    test('trims firstName and lastName', () async {
+      final adapter = _FakeAdapter((options) async => _jsonBody(personResponse(), 201));
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await PeopleApi(
+        dio,
+      ).create(organizationId: 'org-1', firstName: '  Ada  ', lastName: '  Lovelace  ', status: PersonStatus.active);
+
+      final body = adapter.lastRequest!.data as Map<String, dynamic>;
+      expect(body['firstName'], 'Ada');
+      expect(body['lastName'], 'Lovelace');
+    });
+
+    test('omits empty email', () async {
+      final adapter = _FakeAdapter((options) async => _jsonBody(personResponse(), 201));
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await PeopleApi(
+        dio,
+      ).create(organizationId: 'org-1', firstName: 'Ada', lastName: 'Lovelace', email: '', status: PersonStatus.active);
+
+      final body = adapter.lastRequest!.data as Map<String, dynamic>;
+      expect(body.containsKey('email'), isFalse);
+    });
+
+    test('omits whitespace-only email', () async {
+      final adapter = _FakeAdapter((options) async => _jsonBody(personResponse(), 201));
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await PeopleApi(dio).create(
+        organizationId: 'org-1',
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        email: '   ',
+        status: PersonStatus.active,
+      );
+
+      final body = adapter.lastRequest!.data as Map<String, dynamic>;
+      expect(body.containsKey('email'), isFalse);
+    });
+
+    test('trims and lowercases a non-empty email', () async {
+      final adapter = _FakeAdapter((options) async => _jsonBody(personResponse(), 201));
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await PeopleApi(dio).create(
+        organizationId: 'org-1',
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        email: '  ADA@Example.COM  ',
+        status: PersonStatus.active,
+      );
+
+      final body = adapter.lastRequest!.data as Map<String, dynamic>;
+      expect(body['email'], 'ada@example.com');
+    });
+
+    test('omits empty phone', () async {
+      final adapter = _FakeAdapter((options) async => _jsonBody(personResponse(), 201));
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await PeopleApi(
+        dio,
+      ).create(organizationId: 'org-1', firstName: 'Ada', lastName: 'Lovelace', phone: '', status: PersonStatus.active);
+
+      final body = adapter.lastRequest!.data as Map<String, dynamic>;
+      expect(body.containsKey('phone'), isFalse);
+    });
+
+    test('omits whitespace-only phone', () async {
+      final adapter = _FakeAdapter((options) async => _jsonBody(personResponse(), 201));
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await PeopleApi(dio).create(
+        organizationId: 'org-1',
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        phone: '   ',
+        status: PersonStatus.active,
+      );
+
+      final body = adapter.lastRequest!.data as Map<String, dynamic>;
+      expect(body.containsKey('phone'), isFalse);
+    });
+
+    test('trims a non-empty phone', () async {
+      final adapter = _FakeAdapter((options) async => _jsonBody(personResponse(), 201));
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await PeopleApi(dio).create(
+        organizationId: 'org-1',
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        phone: '  +1 234 567  ',
+        status: PersonStatus.active,
+      );
+
+      final body = adapter.lastRequest!.data as Map<String, dynamic>;
+      expect(body['phone'], '+1 234 567');
+    });
+
+    test('serializes Active as ACTIVE', () async {
+      final adapter = _FakeAdapter((options) async => _jsonBody(personResponse(), 201));
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await PeopleApi(
+        dio,
+      ).create(organizationId: 'org-1', firstName: 'Ada', lastName: 'Lovelace', status: PersonStatus.active);
+
+      final body = adapter.lastRequest!.data as Map<String, dynamic>;
+      expect(body['status'], 'ACTIVE');
+    });
+
+    test('serializes Inactive as INACTIVE', () async {
+      final adapter = _FakeAdapter((options) async => _jsonBody(personResponse(status: 'INACTIVE'), 201));
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await PeopleApi(
+        dio,
+      ).create(organizationId: 'org-1', firstName: 'Ada', lastName: 'Lovelace', status: PersonStatus.inactive);
+
+      final body = adapter.lastRequest!.data as Map<String, dynamic>;
+      expect(body['status'], 'INACTIVE');
+    });
+
+    test('never serializes unsupported fields', () async {
+      final adapter = _FakeAdapter((options) async => _jsonBody(personResponse(), 201));
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await PeopleApi(
+        dio,
+      ).create(organizationId: 'org-1', firstName: 'Ada', lastName: 'Lovelace', status: PersonStatus.active);
+
+      final body = adapter.lastRequest!.data as Map<String, dynamic>;
+      expect(body.keys, {'firstName', 'lastName', 'status'});
+    });
+
+    test('parses the returned PersonSummary through the existing envelope authority', () async {
+      final adapter = _FakeAdapter((options) async => _jsonBody(personResponse(), 201));
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      final person = await PeopleApi(
+        dio,
+      ).create(organizationId: 'org-1', firstName: 'Ada', lastName: 'Lovelace', status: PersonStatus.active);
+
+      expect(person.id, 'p1');
+      expect(person.status, PersonStatus.active);
+    });
+
+    test('surfaces a mapped backend error through the existing error authority', () async {
+      final adapter = _FakeAdapter(
+        (options) async => _jsonBody({
+          'success': false,
+          'error': {'code': 'VALIDATION_ERROR', 'message': 'Invalid request.'},
+        }, 422),
+      );
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await expectLater(
+        PeopleApi(dio).create(organizationId: 'org-1', firstName: 'Ada', lastName: 'Lovelace', status: PersonStatus.active),
+        throwsA(isA<Exception>()),
+      );
+    });
+
+    test('gender omitted is not serialized', () async {
+      final adapter = _FakeAdapter((options) async => _jsonBody(personResponse(), 201));
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await PeopleApi(
+        dio,
+      ).create(organizationId: 'org-1', firstName: 'Ada', lastName: 'Lovelace', status: PersonStatus.active);
+
+      final body = adapter.lastRequest!.data as Map<String, dynamic>;
+      expect(body.containsKey('gender'), isFalse);
+    });
+
+    test('Male selection serializes MALE', () async {
+      final adapter = _FakeAdapter((options) async => _jsonBody(personResponse(), 201));
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await PeopleApi(dio).create(
+        organizationId: 'org-1',
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        status: PersonStatus.active,
+        gender: PersonGender.male,
+      );
+
+      final body = adapter.lastRequest!.data as Map<String, dynamic>;
+      expect(body['gender'], 'MALE');
+    });
+
+    test('Female selection serializes FEMALE', () async {
+      final adapter = _FakeAdapter((options) async => _jsonBody(personResponse(), 201));
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await PeopleApi(dio).create(
+        organizationId: 'org-1',
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        status: PersonStatus.active,
+        gender: PersonGender.female,
+      );
+
+      final body = adapter.lastRequest!.data as Map<String, dynamic>;
+      expect(body['gender'], 'FEMALE');
+    });
+
+    test('dateOfBirth omitted is not serialized', () async {
+      final adapter = _FakeAdapter((options) async => _jsonBody(personResponse(), 201));
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await PeopleApi(
+        dio,
+      ).create(organizationId: 'org-1', firstName: 'Ada', lastName: 'Lovelace', status: PersonStatus.active);
+
+      final body = adapter.lastRequest!.data as Map<String, dynamic>;
+      expect(body.containsKey('dateOfBirth'), isFalse);
+    });
+
+    test('selected DOB serializes exact YYYY-MM-DD with no time/offset component', () async {
+      final adapter = _FakeAdapter((options) async => _jsonBody(personResponse(), 201));
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await PeopleApi(dio).create(
+        organizationId: 'org-1',
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        status: PersonStatus.active,
+        dateOfBirth: DateTime(2001, 7, 14),
+      );
+
+      final body = adapter.lastRequest!.data as Map<String, dynamic>;
+      expect(body['dateOfBirth'], '2001-07-14');
+      expect(body['dateOfBirth'], isNot(contains('T')));
+      expect(body['dateOfBirth'], isNot(contains('Z')));
+      expect(body['dateOfBirth'], isNot(contains('+')));
+    });
+
+    test('address omitted is not serialized', () async {
+      final adapter = _FakeAdapter((options) async => _jsonBody(personResponse(), 201));
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await PeopleApi(
+        dio,
+      ).create(organizationId: 'org-1', firstName: 'Ada', lastName: 'Lovelace', status: PersonStatus.active);
+
+      final body = adapter.lastRequest!.data as Map<String, dynamic>;
+      expect(body.containsKey('address'), isFalse);
+    });
+
+    test('whitespace-only address is omitted', () async {
+      final adapter = _FakeAdapter((options) async => _jsonBody(personResponse(), 201));
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await PeopleApi(dio).create(
+        organizationId: 'org-1',
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        status: PersonStatus.active,
+        address: '   ',
+      );
+
+      final body = adapter.lastRequest!.data as Map<String, dynamic>;
+      expect(body.containsKey('address'), isFalse);
+    });
+
+    test('non-empty address is trimmed', () async {
+      final adapter = _FakeAdapter((options) async => _jsonBody(personResponse(), 201));
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await PeopleApi(dio).create(
+        organizationId: 'org-1',
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        status: PersonStatus.active,
+        address: '  123 Main St  ',
+      );
+
+      final body = adapter.lastRequest!.data as Map<String, dynamic>;
+      expect(body['address'], '123 Main St');
+    });
+
+    test('gender/dateOfBirth/address absent when unsupplied, and all other fields still exact', () async {
+      final adapter = _FakeAdapter((options) async => _jsonBody(personResponse(), 201));
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await PeopleApi(
+        dio,
+      ).create(organizationId: 'org-1', firstName: 'Ada', lastName: 'Lovelace', status: PersonStatus.active);
+
+      final body = adapter.lastRequest!.data as Map<String, dynamic>;
+      expect(body.keys, {'firstName', 'lastName', 'status'});
     });
   });
 }

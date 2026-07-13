@@ -1,7 +1,9 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
+import { Prisma } from '../../generated/prisma/client';
 import { ApiException } from '../common/http/api-exception';
 import { PrismaService } from '../database/prisma.service';
 import { decodeCursor, encodeCursor } from './cursor.util';
+import { parseCalendarDateOnlyToUtcDate } from './date-of-birth.validator';
 import { CreatePersonDto } from './dto/create-person.dto';
 import { ListPeopleQueryDto } from './dto/list-people-query.dto';
 import { UpdatePersonDto } from './dto/update-person.dto';
@@ -38,8 +40,18 @@ export interface PersonSummary {
   joinedAt: string;
 }
 
+/**
+ * List-only enrichment. Deliberately a separate type from PersonSummary so
+ * Create/Update (which reuse toSummary() directly) never widen to include
+ * these two fields — only PeopleService.list() ever constructs this shape.
+ */
+export interface PersonListSummary extends PersonSummary {
+  currentJourneyStage: { id: string; name: string } | null;
+  lastAttendance: { checkedInAt: string } | null;
+}
+
 export interface PeopleListResult {
-  people: PersonSummary[];
+  people: PersonListSummary[];
   nextCursor: string | null;
 }
 
@@ -106,8 +118,24 @@ export class PeopleService {
     const pageRows = hasMore ? rows.slice(0, limit) : rows;
     const nextCursor = hasMore ? encodeCursor({ id: pageRows[pageRows.length - 1].id, sort }) : null;
 
+    if (pageRows.length === 0) {
+      return { people: [], nextCursor };
+    }
+
+    // Exactly two bounded batch queries per non-empty page — never one per
+    // person — regardless of how many rows the page contains.
+    const personIds = pageRows.map((row) => row.id);
+    const [journeyStageByPersonId, lastAttendanceByPersonId] = await Promise.all([
+      this.resolveCurrentJourneyStages(organizationId, personIds),
+      this.resolveLatestAttendance(organizationId, personIds),
+    ]);
+
     return {
-      people: pageRows.map((row) => this.toSummary(row)),
+      people: pageRows.map((row) => ({
+        ...this.toSummary(row),
+        currentJourneyStage: journeyStageByPersonId.get(row.id) ?? null,
+        lastAttendance: lastAttendanceByPersonId.get(row.id) ?? null,
+      })),
       nextCursor,
     };
   }
@@ -152,6 +180,9 @@ export class PeopleService {
         email: dto.email ?? null,
         phone: dto.phone ?? null,
         status: dto.status ?? 'ACTIVE',
+        gender: dto.gender ?? null,
+        dateOfBirth: dto.dateOfBirth ? parseCalendarDateOnlyToUtcDate(dto.dateOfBirth) : null,
+        address: dto.address ?? null,
       },
       select: PERSON_SELECT,
     })) as PersonRow;
@@ -246,6 +277,79 @@ export class PeopleService {
     `;
 
     return rows.map((row) => row.person_id);
+  }
+
+  /**
+   * Batch-resolves each page person's current journey stage in exactly one
+   * query (never one per person), using the same latest-row-per-person
+   * DISTINCT ON pattern as resolveJourneyStageMatches above. Person A
+   * Journey history has no organizationId column of its own, so isolation
+   * is enforced by joining through organization-owned People — identical to
+   * the existing precedent, not a new scoping mechanism.
+   */
+  private async resolveCurrentJourneyStages(
+    organizationId: string,
+    personIds: string[],
+  ): Promise<Map<string, { id: string; name: string }>> {
+    const idParams = Prisma.join(personIds.map((id) => Prisma.sql`${id}::uuid`));
+
+    const latestRows = await this.prisma.$queryRaw<Array<{ person_id: string; to_stage_id: string }>>`
+      SELECT DISTINCT ON (h.person_id) h.person_id, h.to_stage_id
+      FROM person_journey_history h
+      INNER JOIN people p ON p.id = h.person_id
+      WHERE p.organization_id = ${organizationId}::uuid
+        AND h.person_id IN (${idParams})
+      ORDER BY h.person_id, h.moved_at DESC, h.id DESC
+    `;
+
+    if (latestRows.length === 0) {
+      return new Map();
+    }
+
+    // Re-validated against this organization's own journey configuration —
+    // never trusts to_stage_id alone as proof of organization ownership.
+    const stageIds = [...new Set(latestRows.map((row) => row.to_stage_id))];
+    const stages = await this.prisma.journeyStage.findMany({
+      where: { id: { in: stageIds }, journeyTemplate: { organizationId } },
+      select: { id: true, name: true },
+    });
+    const stageById = new Map(stages.map((stage) => [stage.id, stage]));
+
+    const result = new Map<string, { id: string; name: string }>();
+    for (const row of latestRows) {
+      const stage = stageById.get(row.to_stage_id);
+      if (stage) {
+        result.set(row.person_id, stage);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Batch-resolves each page person's latest Attendance row in exactly one
+   * query (never one per person). Attendance carries its own organizationId
+   * column, so both that column and the pre-scoped personId list constrain
+   * the query — defense in depth beyond the already-organization-scoped ids.
+   */
+  private async resolveLatestAttendance(
+    organizationId: string,
+    personIds: string[],
+  ): Promise<Map<string, { checkedInAt: string }>> {
+    const idParams = Prisma.join(personIds.map((id) => Prisma.sql`${id}::uuid`));
+
+    const rows = await this.prisma.$queryRaw<Array<{ person_id: string; checked_in_at: Date }>>`
+      SELECT DISTINCT ON (person_id) person_id, checked_in_at
+      FROM attendance
+      WHERE organization_id = ${organizationId}::uuid
+        AND person_id IN (${idParams})
+      ORDER BY person_id, checked_in_at DESC, id DESC
+    `;
+
+    const result = new Map<string, { checkedInAt: string }>();
+    for (const row of rows) {
+      result.set(row.person_id, { checkedInAt: row.checked_in_at.toISOString() });
+    }
+    return result;
   }
 
   private toSummary(row: PersonRow): PersonSummary {

@@ -32,6 +32,8 @@ describe('People route composition', () => {
     person: { findMany: jest.Mock; findFirst: jest.Mock; create: jest.Mock; update: jest.Mock };
     personTag: { findMany: jest.Mock };
     personJourneyHistory: { findFirst: jest.Mock };
+    journeyStage: { findMany: jest.Mock };
+    $queryRaw: jest.Mock;
   };
   let validToken: string;
 
@@ -45,6 +47,8 @@ describe('People route composition', () => {
       person: { findMany: jest.fn(), findFirst: jest.fn(), create: jest.fn(), update: jest.fn() },
       personTag: { findMany: jest.fn() },
       personJourneyHistory: { findFirst: jest.fn() },
+      journeyStage: { findMany: jest.fn().mockResolvedValue([]) },
+      $queryRaw: jest.fn().mockResolvedValue([]),
     };
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
@@ -157,6 +161,32 @@ describe('People route composition', () => {
     expect(json.data).toEqual({ people: [], nextCursor: null });
   });
 
+  it('GET list includes currentJourneyStage and lastAttendance end-to-end, both nullable', async () => {
+    prisma.person.findMany.mockResolvedValue([
+      {
+        id: PERSON_ID,
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        email: null,
+        phone: null,
+        status: 'ACTIVE',
+        profilePhoto: null,
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      },
+    ]);
+    prisma.$queryRaw
+      .mockResolvedValueOnce([{ person_id: PERSON_ID, to_stage_id: 'stage-1' }])
+      .mockResolvedValueOnce([{ person_id: PERSON_ID, checked_in_at: new Date('2026-05-25T09:00:00.000Z') }]);
+    prisma.journeyStage.findMany.mockResolvedValue([{ id: 'stage-1', name: 'Connected Guest' }]);
+
+    const { status, json } = await request('GET', listPath, validToken);
+
+    expect(status).toBe(200);
+    const person = (json.data!.people as Array<Record<string, unknown>>)[0];
+    expect(person.currentJourneyStage).toEqual({ id: 'stage-1', name: 'Connected Guest' });
+    expect(person.lastAttendance).toEqual({ checkedInAt: '2026-05-25T09:00:00.000Z' });
+  });
+
   it('GET detail returns PERSON_NOT_FOUND for a cross-tenant/absent person', async () => {
     prisma.person.findFirst.mockResolvedValue(null);
 
@@ -209,6 +239,153 @@ describe('People route composition', () => {
 
     expect(status).toBe(400);
     expect(json.success).toBe(false);
+  });
+
+  describe('POST create gender/dateOfBirth/address contract', () => {
+    beforeEach(() => {
+      prisma.person.create.mockResolvedValue({
+        id: PERSON_ID,
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        email: null,
+        phone: null,
+        status: 'ACTIVE',
+        profilePhoto: null,
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      });
+    });
+
+    it('accepts gender omitted', async () => {
+      const { status } = await request('POST', listPath, validToken, { firstName: 'Ada', lastName: 'Lovelace' });
+
+      expect(status).toBe(201);
+    });
+
+    it.each(['MALE', 'FEMALE'])('accepts gender %s', async (gender) => {
+      const { status } = await request('POST', listPath, validToken, {
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        gender,
+      });
+
+      expect(status).toBe(201);
+    });
+
+    it.each(['Male', 'Female', 'male', 'female', 'OTHER', 'PREFER_NOT_TO_SAY', 'NON_BINARY', ''])(
+      'rejects gender %s',
+      async (gender) => {
+        const { status, json } = await request('POST', listPath, validToken, {
+          firstName: 'Ada',
+          lastName: 'Lovelace',
+          gender,
+        });
+
+        expect(status).toBe(400);
+        expect(json.success).toBe(false);
+      },
+    );
+
+    it('accepts dateOfBirth omitted', async () => {
+      const { status } = await request('POST', listPath, validToken, { firstName: 'Ada', lastName: 'Lovelace' });
+
+      expect(status).toBe(201);
+    });
+
+    it('accepts a valid YYYY-MM-DD dateOfBirth', async () => {
+      const { status } = await request('POST', listPath, validToken, {
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        dateOfBirth: '2001-07-14',
+      });
+
+      expect(status).toBe(201);
+    });
+
+    it('accepts the leap day 2000-02-29', async () => {
+      const { status } = await request('POST', listPath, validToken, {
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        dateOfBirth: '2000-02-29',
+      });
+
+      expect(status).toBe(201);
+    });
+
+    it.each([
+      '01-07-2001',
+      '2001/07/14',
+      '2001-7-14',
+      '2001-07-4',
+      '2001-07-14T00:00:00Z',
+      '2001-07-14T00:00:00+01:00',
+      '2025-02-29',
+      '2025-02-30',
+      '2023-13-01',
+      '2023-00-10',
+      'not-a-date',
+    ])('rejects malformed or impossible dateOfBirth %s', async (dateOfBirth) => {
+      const { status, json } = await request('POST', listPath, validToken, {
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        dateOfBirth,
+      });
+
+      expect(status).toBe(400);
+      expect(json.success).toBe(false);
+    });
+
+    it('accepts address omitted', async () => {
+      const { status } = await request('POST', listPath, validToken, { firstName: 'Ada', lastName: 'Lovelace' });
+
+      expect(status).toBe(201);
+    });
+
+    it('accepts a non-empty address', async () => {
+      const { status } = await request('POST', listPath, validToken, {
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        address: '123 Main St',
+      });
+
+      expect(status).toBe(201);
+    });
+
+    it('accepts a whitespace-only address at transport and persists it as null', async () => {
+      const { status } = await request('POST', listPath, validToken, {
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        address: '   ',
+      });
+
+      expect(status).toBe(201);
+      const args = prisma.person.create.mock.calls[0][0];
+      expect(args.data.address).toBeNull();
+    });
+
+    it.each(['avatarUrl', 'profilePhoto', 'group', 'groupId', 'notes', 'occupation', 'currentJourneyStageId', 'tags'])(
+      'rejects unsupported field %s',
+      async (field) => {
+        const { status, json } = await request('POST', listPath, validToken, {
+          firstName: 'Ada',
+          lastName: 'Lovelace',
+          [field]: 'some-value',
+        });
+
+        expect(status).toBe(400);
+        expect(json.success).toBe(false);
+      },
+    );
+
+    it('rejects an arbitrary unknown field', async () => {
+      const { status, json } = await request('POST', listPath, validToken, {
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        totallyUnknownField: 'x',
+      });
+
+      expect(status).toBe(400);
+      expect(json.success).toBe(false);
+    });
   });
 
   it('DELETE returns {success:true} on first delete and PERSON_NOT_FOUND on repeat', async () => {

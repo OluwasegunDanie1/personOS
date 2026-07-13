@@ -1,6 +1,7 @@
 import { Transform } from 'class-transformer';
 import { IsEmail, IsIn, IsNotEmpty, IsOptional, IsString } from 'class-validator';
-import { PERSON_STATUS_VALUES, PersonStatusValue } from '../people.constants';
+import { IsCalendarDateOnly } from '../date-of-birth.validator';
+import { PERSON_GENDER_VALUES, PERSON_STATUS_VALUES, PersonGenderValue, PersonStatusValue } from '../people.constants';
 
 function trim({ value }: { value: unknown }): unknown {
   return typeof value === 'string' ? value.trim() : value;
@@ -41,4 +42,18 @@ export class CreatePersonDto {
   @IsOptional()
   @IsIn(PERSON_STATUS_VALUES)
   status?: PersonStatusValue;
+
+  @IsOptional()
+  @IsIn(PERSON_GENDER_VALUES)
+  gender?: PersonGenderValue;
+
+  @IsOptional()
+  @Transform(normalizeNullable)
+  @IsCalendarDateOnly()
+  dateOfBirth?: string | null;
+
+  @IsOptional()
+  @Transform(normalizeNullable)
+  @IsString()
+  address?: string | null;
 }

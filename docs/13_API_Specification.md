@@ -516,13 +516,23 @@ Success response data:
       "phone": "string | null",
       "status": "ACTIVE | INACTIVE",
       "avatarUrl": "string | null",
-      "joinedAt": "string"
+      "joinedAt": "string",
+      "currentJourneyStage": { "id": "string", "name": "string" } | null,
+      "lastAttendance": { "checkedInAt": "string" } | null
     }
   ],
   "nextCursor": "string | null"
 }
 
-joinedAt maps to Person.createdAt. The list response does not include tags, current journey stage, attendance summary, follow-up summary, notes, or membership information.
+joinedAt maps to Person.createdAt.
+
+currentJourneyStage is resolved from the latest PersonJourneyHistory row per Person, ordered movedAt descending then id descending (the same deterministic ordering rule used by the journeyStageId filter above); a Person with no journey history returns null. Journey stage names are organization-configured through the existing Journey Stage endpoints and are not a fixed set of system enums — no reference label (e.g. Visitor, Member, Volunteer, Leader) is hardcoded by this contract. Only id and name are included; position, color, description, and any journey-template identifiers are not part of this shape.
+
+lastAttendance is resolved from the latest Attendance row per Person, ordered checkedInAt descending then id descending; a Person with no Attendance record returns null. checkedInAt is Attendance's authoritative timestamp and is returned as an ISO-8601 absolute instant. Only checkedInAt is included — event detail (id, title, start time), attendance status, and the Attendance record's own id are not part of this shape.
+
+Both fields are resolved per page in bounded, organization-scoped batch operations, not per-Person queries.
+
+The list response still does not include tags, follow-up summary, notes, membership information, Person.address, Person.gender, Person.dateOfBirth, or Group data. Create Person's response and Person Detail's response are unchanged by this contract; currentJourneyStage and lastAttendance in this exact List shape are List-only.
 
 Empty state (HTTP 200, standard success envelope):
 
@@ -541,18 +551,21 @@ Request fields (no others accepted):
   "lastName": "string",
   "email": "string | null (optional)",
   "phone": "string | null (optional)",
-  "status": "ACTIVE | INACTIVE (optional)"
+  "status": "ACTIVE | INACTIVE (optional)",
+  "gender": "MALE | FEMALE (optional)",
+  "dateOfBirth": "string | null (optional)",
+  "address": "string | null (optional)"
 }
 
 Required: firstName, lastName.
 
-Normalization: firstName and lastName are trimmed; email is trimmed and lowercased; phone is trimmed; an empty normalized optional email or phone becomes null.
+Normalization: firstName and lastName are trimmed; email is trimmed and lowercased; phone is trimmed; dateOfBirth and address are trimmed; an empty normalized optional email, phone, dateOfBirth, or address becomes null.
 
-Validation: firstName and lastName must remain non-empty after trim; email, when non-null, must be syntactically valid; status, when supplied, must be ACTIVE or INACTIVE. Default status is ACTIVE.
+Validation: firstName and lastName must remain non-empty after trim; email, when non-null, must be syntactically valid; status, when supplied, must be ACTIVE or INACTIVE. Default status is ACTIVE. gender, when supplied, must be exactly MALE or FEMALE (case-sensitive); no other value, including lowercase or mixed-case variants, is accepted. dateOfBirth, when non-null, must be a date-only string in exact YYYY-MM-DD form representing a real calendar date; an ISO 8601 datetime (with a time component, an offset, or a Z suffix) is rejected, as is a calendar-invalid date such as 2025-02-30 or 2023-13-01. address, when non-null, is free text with no structural decomposition (no street/city/state/postal/country subfields).
 
 Relvio v1 imposes no database uniqueness on Person.email or Person.phone. Creation is never rejected merely because another Person in the organization shares the same email or phone. No duplicate detection or merge behavior is implemented.
 
-Creation does not assign tags, assign a journey stage, or create journey history, attendance, a follow-up, or a note.
+Creation does not assign tags, assign a journey stage, or create journey history, attendance, a follow-up, or a note. gender, dateOfBirth, and address are persisted on the Person row but are not included in the create success response or in any List/Detail response; they remain write-only through this endpoint in v1.
 
 Success response data (HTTP 201, standard success envelope):
 

@@ -28,10 +28,57 @@ enum PersonStatus {
   }
 }
 
+/// Write-only through Create Person in v1: the backend persists gender but
+/// never returns it (not in PersonSummary, List, or Detail), so this enum
+/// exists purely for the Add Person request, not for parsing any response.
+/// Canonical API values are exactly MALE/FEMALE (13_API_Specification.md);
+/// there is no Other/Prefer-not-to-say/Unspecified authority.
+enum PersonGender {
+  male,
+  female;
+
+  String toApiValue() {
+    switch (this) {
+      case PersonGender.male:
+        return 'MALE';
+      case PersonGender.female:
+        return 'FEMALE';
+    }
+  }
+}
+
+/// List-only (Product Task 035): {id, name}. Never returned by Create, so
+/// this is only ever constructed via PersonSummary.fromJson on a List
+/// response. name is the organization's own configured stage label — never
+/// transformed, never assumed to be one of a fixed reference set.
+class JourneyStageSummary {
+  const JourneyStageSummary({required this.id, required this.name});
+
+  final String id;
+  final String name;
+
+  factory JourneyStageSummary.fromJson(Map<String, dynamic> json) =>
+      JourneyStageSummary(id: json['id'] as String, name: json['name'] as String);
+}
+
+/// List-only (Product Task 035): {checkedInAt}. No event detail, status, or
+/// attendance id is part of this contract — never returned by Create.
+class LastAttendanceSummary {
+  const LastAttendanceSummary({required this.checkedInAt});
+
+  final DateTime checkedInAt;
+
+  factory LastAttendanceSummary.fromJson(Map<String, dynamic> json) =>
+      LastAttendanceSummary(checkedInAt: DateTime.parse(json['checkedInAt'] as String));
+}
+
 /// Mirrors PersonSummary exactly: {id, firstName, lastName, email, phone,
-/// status, avatarUrl, joinedAt}. No journeyStage/lastAttendance/team/group/
-/// role/memberType/followUpCount/notesCount field exists here — none of
-/// those are part of the approved API contract for this endpoint.
+/// status, avatarUrl, joinedAt}, plus the two List-only enrichment fields
+/// added by Product Task 035 (currentJourneyStage, lastAttendance) — both
+/// optional/nullable so a Create-response-shaped payload (which omits both)
+/// still parses successfully. No team/group/role/memberType/followUpCount/
+/// notesCount/address/gender/dateOfBirth field exists here — none of those
+/// are part of the approved API contract for this endpoint.
 class PersonSummary {
   const PersonSummary({
     required this.id,
@@ -42,6 +89,8 @@ class PersonSummary {
     required this.status,
     required this.avatarUrl,
     required this.joinedAt,
+    this.currentJourneyStage,
+    this.lastAttendance,
   });
 
   final String id;
@@ -52,6 +101,8 @@ class PersonSummary {
   final PersonStatus status;
   final String? avatarUrl;
   final DateTime joinedAt;
+  final JourneyStageSummary? currentJourneyStage;
+  final LastAttendanceSummary? lastAttendance;
 
   String get displayName => '$firstName $lastName'.trim();
 
@@ -74,6 +125,12 @@ class PersonSummary {
     status: PersonStatus.fromApiValue(json['status'] as String),
     avatarUrl: json['avatarUrl'] as String?,
     joinedAt: DateTime.parse(json['joinedAt'] as String),
+    currentJourneyStage: json['currentJourneyStage'] != null
+        ? JourneyStageSummary.fromJson(json['currentJourneyStage'] as Map<String, dynamic>)
+        : null,
+    lastAttendance: json['lastAttendance'] != null
+        ? LastAttendanceSummary.fromJson(json['lastAttendance'] as Map<String, dynamic>)
+        : null,
   );
 }
 

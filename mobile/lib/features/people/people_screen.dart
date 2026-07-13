@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../app/theme/app_colors.dart';
 import '../../app/widgets/empty_state.dart';
+import '../../app/widgets/primary_button.dart';
 import 'people_models.dart';
 import 'people_state_controller.dart';
 
@@ -50,9 +52,21 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(peopleDirectoryControllerProvider);
     final controller = ref.read(peopleDirectoryControllerProvider.notifier);
+    final showFab = state.status == PeopleLoadStatus.loaded && state.people.isNotEmpty;
 
     return Scaffold(
       backgroundColor: AppColors.backgroundPrimary,
+      // Floating (bottom-right, anchored above bottom nav), not full-width —
+      // an extended FAB with icon + label rather than the screen-wide button.
+      floatingActionButton: showFab
+          ? FloatingActionButton.extended(
+              onPressed: () => context.push('/people/add'),
+              backgroundColor: AppColors.brandPrimary,
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.person_add_outlined),
+              label: const Text('Add Person'),
+            )
+          : null,
       body: SafeArea(
         child: RefreshIndicator(
           onRefresh: controller.refresh,
@@ -64,10 +78,7 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
                 child: _SearchField(controller: _searchController, onChanged: controller.updateSearch),
               ),
               SliverToBoxAdapter(
-                child: _StatusFilterRow(
-                  selected: state.statusFilter,
-                  onSelected: controller.updateStatusFilter,
-                ),
+                child: _StatusFilterRow(selected: state.statusFilter, onSelected: controller.updateStatusFilter),
               ),
               ..._contentSlivers(state, controller),
             ],
@@ -97,12 +108,17 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
       case PeopleLoadStatus.loaded:
         if (state.people.isEmpty) {
           return [
-            const SliverFillRemaining(
+            SliverFillRemaining(
               hasScrollBody: false,
               child: EmptyState(
                 icon: Icons.groups_outlined,
                 title: 'No people yet.',
                 message: 'Start building your community by adding your first person.',
+                action: PrimaryButton(
+                  label: 'Add First Person',
+                  icon: Icons.person_add_outlined,
+                  onPressed: () => context.push('/people/add'),
+                ),
               ),
             ),
           ];
@@ -232,6 +248,9 @@ class _StatusFilterRow extends StatelessWidget {
   }
 }
 
+/// Non-interactive: no onTap/InkWell/GestureDetector. Person Profile
+/// navigation remains a later, separately-authorized slice (Product Task
+/// 034 §12); this row never pushes a route.
 class _PersonRow extends StatelessWidget {
   const _PersonRow({required this.person});
 
@@ -239,6 +258,11 @@ class _PersonRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final phone = person.phone;
+    final email = person.email;
+    final stage = person.currentJourneyStage;
+    final lastAttendance = person.lastAttendance;
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
       decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.borderSubtle))),
@@ -251,53 +275,148 @@ class _PersonRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
+                Wrap(
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 8,
+                  runSpacing: 4,
                   children: [
-                    Flexible(
-                      child: Text(
-                        person.displayName,
-                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: AppColors.textPrimary),
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                    Text(
+                      person.displayName,
+                      style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: AppColors.textPrimary),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(width: 8),
-                    _StatusDot(status: person.status),
+                    if (stage != null) _JourneyStageBadge(stage: stage),
                   ],
                 ),
-                if (person.email != null) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    person.email!,
-                    style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                if (phone != null && phone.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  _ContactRow(icon: Icons.phone_outlined, text: phone),
                 ],
-                if (person.phone != null) ...[
+                if (email != null && email.isNotEmpty) ...[
                   const SizedBox(height: 2),
-                  Text(
-                    person.phone!,
-                    style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                  _ContactRow(icon: Icons.mail_outline, text: email),
                 ],
               ],
             ),
           ),
+          if (lastAttendance != null) ...[
+            const SizedBox(width: 12),
+            _LastAttendanceBlock(checkedInAt: lastAttendance.checkedInAt),
+          ],
         ],
       ),
     );
   }
 }
 
-class _StatusDot extends StatelessWidget {
-  const _StatusDot({required this.status});
+class _ContactRow extends StatelessWidget {
+  const _ContactRow({required this.icon, required this.text});
 
-  final PersonStatus status;
+  final IconData icon;
+  final String text;
 
   @override
   Widget build(BuildContext context) {
-    final color = status == PersonStatus.active ? const Color(0xFF16A34A) : AppColors.textSecondary;
-    return Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle));
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 13, color: AppColors.textSecondary),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            text,
+            style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// One neutral, consistent pill treatment for every journey stage — Journey
+/// Stage carries no authoritative color field, and stage names are fully
+/// organization-configurable, so no color/semantic meaning is derived from
+/// the name itself (see Product Task 034/035 authority).
+class _JourneyStageBadge extends StatelessWidget {
+  const _JourneyStageBadge({required this.stage});
+
+  final JourneyStageSummary stage;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 140),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.brandPrimary.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.brandPrimary.withValues(alpha: 0.25)),
+      ),
+      child: Text(
+        stage.name,
+        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.brandPrimary),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+}
+
+const _lastAttendanceMonthAbbreviations = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
+/// Today, h:mm AM/PM for the device's local calendar-today; otherwise
+/// MMM d, yyyy. Never shows seconds, timezone abbreviations, or raw ISO.
+String formatLastAttendance(DateTime checkedInAt, {DateTime? now}) {
+  final local = checkedInAt.toLocal();
+  final reference = now ?? DateTime.now();
+
+  final isToday = local.year == reference.year && local.month == reference.month && local.day == reference.day;
+
+  if (isToday) {
+    final period = local.hour >= 12 ? 'PM' : 'AM';
+    final hour12Raw = local.hour % 12;
+    final hour12 = hour12Raw == 0 ? 12 : hour12Raw;
+    final minute = local.minute.toString().padLeft(2, '0');
+    return 'Today, $hour12:$minute $period';
+  }
+
+  return '${_lastAttendanceMonthAbbreviations[local.month - 1]} ${local.day}, ${local.year}';
+}
+
+class _LastAttendanceBlock extends StatelessWidget {
+  const _LastAttendanceBlock({required this.checkedInAt});
+
+  final DateTime checkedInAt;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Text('Last attendance', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
+        const SizedBox(height: 2),
+        Text(
+          formatLastAttendance(checkedInAt),
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textPrimary),
+          textAlign: TextAlign.right,
+        ),
+      ],
+    );
   }
 }
 
@@ -306,18 +425,36 @@ class _PersonAvatar extends StatelessWidget {
 
   final PersonSummary person;
 
+  static const double _diameter = 52;
+
   @override
   Widget build(BuildContext context) {
     final avatarUrl = person.avatarUrl;
 
     if (avatarUrl != null && avatarUrl.isNotEmpty) {
-      return CircleAvatar(radius: 26, backgroundImage: NetworkImage(avatarUrl));
+      return ClipOval(
+        child: Image.network(
+          avatarUrl,
+          width: _diameter,
+          height: _diameter,
+          fit: BoxFit.cover,
+          // Shows the same stable initials/icon fallback while loading and
+          // on error — never Flutter's default broken-image glyph.
+          loadingBuilder: (context, child, loadingProgress) =>
+              loadingProgress == null ? child : _fallback(),
+          errorBuilder: (context, error, stackTrace) => _fallback(),
+        ),
+      );
     }
 
+    return _fallback();
+  }
+
+  Widget _fallback() {
     final initials = person.initials;
     if (initials.isNotEmpty) {
       return CircleAvatar(
-        radius: 26,
+        radius: _diameter / 2,
         backgroundColor: AppColors.brandPrimary.withValues(alpha: 0.12),
         child: Text(
           initials,
@@ -327,7 +464,7 @@ class _PersonAvatar extends StatelessWidget {
     }
 
     return CircleAvatar(
-      radius: 26,
+      radius: _diameter / 2,
       backgroundColor: AppColors.brandPrimary.withValues(alpha: 0.12),
       child: const Icon(Icons.person_outline, color: AppColors.brandPrimary),
     );
