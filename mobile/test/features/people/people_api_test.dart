@@ -893,4 +893,328 @@ void main() {
       );
     });
   });
+
+  group('Person-scoped Follow-up list parsing and request construction (Product Task 043)', () {
+    Map<String, dynamic> followUpJson({Map<String, dynamic> overrides = const {}}) => {
+      'id': 'fu1',
+      'title': 'Call to check in',
+      'description': 'Quick welfare check',
+      'dueDate': '2026-08-02T09:00:00.000Z',
+      'status': 'PENDING',
+      'completedAt': null,
+      'person': {'id': 'p1', 'firstName': 'Ada', 'lastName': 'Lovelace'},
+      'assignedTo': {'id': 'u1', 'firstName': 'Grace', 'lastName': 'Hopper'},
+      ...overrides,
+    };
+
+    test('sends person_id, sort=dueDate_asc, limit=100, and no status filter', () async {
+      final adapter = _FakeAdapter(
+        (options) async => _jsonBody({
+          'success': true,
+          'data': {'followUps': [], 'nextCursor': null},
+        }, 200),
+      );
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await PeopleApi(dio).personFollowUps(organizationId: 'org-1', personId: 'p1');
+
+      final query = adapter.lastRequest!.queryParameters;
+      expect(query['person_id'], 'p1');
+      expect(query['sort'], 'dueDate_asc');
+      expect(query['limit'], 100);
+      expect(query.containsKey('status'), isFalse);
+      expect(adapter.lastRequest!.path, '/organizations/org-1/follow-ups');
+    });
+
+    test('parses a fully-populated Follow-up entry exactly', () async {
+      final adapter = _FakeAdapter(
+        (options) async => _jsonBody({
+          'success': true,
+          'data': {
+            'followUps': [followUpJson()],
+            'nextCursor': null,
+          },
+        }, 200),
+      );
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      final result = await PeopleApi(dio).personFollowUps(organizationId: 'org-1', personId: 'p1');
+
+      final followUp = result.followUps.single;
+      expect(followUp.id, 'fu1');
+      expect(followUp.title, 'Call to check in');
+      expect(followUp.description, 'Quick welfare check');
+      expect(followUp.dueDate, DateTime.parse('2026-08-02T09:00:00.000Z'));
+      expect(followUp.status, FollowUpStatus.pending);
+      expect(followUp.completedAt, isNull);
+      expect(followUp.person.id, 'p1');
+      expect(followUp.assignedTo!.id, 'u1');
+      expect(followUp.assignedTo!.displayName, 'Grace Hopper');
+    });
+
+    test('parses IN_PROGRESS and COMPLETED status values exactly', () async {
+      for (final entry in {'IN_PROGRESS': FollowUpStatus.inProgress, 'COMPLETED': FollowUpStatus.completed}.entries) {
+        final adapter = _FakeAdapter(
+          (options) async => _jsonBody({
+            'success': true,
+            'data': {
+              'followUps': [
+                followUpJson(overrides: {'status': entry.key}),
+              ],
+              'nextCursor': null,
+            },
+          }, 200),
+        );
+        final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+        final result = await PeopleApi(dio).personFollowUps(organizationId: 'org-1', personId: 'p1');
+        expect(result.followUps.single.status, entry.value);
+      }
+    });
+
+    test('an unknown status value is rejected, not silently accepted (no invented UPCOMING/OVERDUE/CANCELLED)', () async {
+      final adapter = _FakeAdapter(
+        (options) async => _jsonBody({
+          'success': true,
+          'data': {
+            'followUps': [
+              followUpJson(overrides: {'status': 'UPCOMING'}),
+            ],
+            'nextCursor': null,
+          },
+        }, 200),
+      );
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await expectLater(
+        PeopleApi(dio).personFollowUps(organizationId: 'org-1', personId: 'p1'),
+        throwsA(isA<ArgumentError>()),
+      );
+    });
+
+    test('nullable dueDate, description, and assignedTo are preserved as null', () async {
+      final adapter = _FakeAdapter(
+        (options) async => _jsonBody({
+          'success': true,
+          'data': {
+            'followUps': [
+              followUpJson(overrides: {'description': null, 'dueDate': null, 'assignedTo': null}),
+            ],
+            'nextCursor': null,
+          },
+        }, 200),
+      );
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      final followUp = (await PeopleApi(dio).personFollowUps(organizationId: 'org-1', personId: 'p1')).followUps.single;
+      expect(followUp.description, isNull);
+      expect(followUp.dueDate, isNull);
+      expect(followUp.assignedTo, isNull);
+    });
+
+    test('nextCursor parsing and hasMore semantics', () async {
+      final withCursorAdapter = _FakeAdapter(
+        (options) async => _jsonBody({
+          'success': true,
+          'data': {
+            'followUps': [followUpJson()],
+            'nextCursor': 'opaque-cursor',
+          },
+        }, 200),
+      );
+      final withCursorResult = await PeopleApi(
+        Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = withCursorAdapter,
+      ).personFollowUps(organizationId: 'org-1', personId: 'p1');
+      expect(withCursorResult.nextCursor, 'opaque-cursor');
+      expect(withCursorResult.hasMore, isTrue);
+
+      final noCursorAdapter = _FakeAdapter(
+        (options) async => _jsonBody({
+          'success': true,
+          'data': {'followUps': [], 'nextCursor': null},
+        }, 200),
+      );
+      final noCursorResult = await PeopleApi(
+        Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = noCursorAdapter,
+      ).personFollowUps(organizationId: 'org-1', personId: 'p1');
+      expect(noCursorResult.hasMore, isFalse);
+    });
+
+    test('a missing required field throws (existing model parsing convention)', () async {
+      final adapter = _FakeAdapter(
+        (options) async => _jsonBody({
+          'success': true,
+          'data': {
+            'followUps': [followUpJson()..remove('title')],
+            'nextCursor': null,
+          },
+        }, 200),
+      );
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await expectLater(
+        PeopleApi(dio).personFollowUps(organizationId: 'org-1', personId: 'p1'),
+        throwsA(isA<TypeError>()),
+      );
+    });
+  });
+
+  group('Create Follow-up request construction and response parsing (Product Task 043)', () {
+    Map<String, dynamic> createdFollowUpResponse() => {
+      'id': 'fu-new',
+      'title': 'New follow-up',
+      'description': null,
+      'dueDate': null,
+      'status': 'PENDING',
+      'completedAt': null,
+      'person': {'id': 'p1', 'firstName': 'Ada', 'lastName': 'Lovelace'},
+      'assignedTo': null,
+    };
+
+    test('posts to the organization-scoped Follow-ups endpoint with exactly personId and title', () async {
+      final adapter = _FakeAdapter(
+        (options) async => _jsonBody({
+          'success': true,
+          'data': {'followUp': createdFollowUpResponse()},
+        }, 201),
+      );
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await PeopleApi(dio).createFollowUp(organizationId: 'org-1', personId: 'p1', title: 'New follow-up');
+
+      expect(adapter.lastRequest!.path, '/organizations/org-1/follow-ups');
+      final body = adapter.lastRequest!.data as Map<String, dynamic>;
+      expect(body, {'personId': 'p1', 'title': 'New follow-up'});
+    });
+
+    test('absent optional fields (description, dueDate) are not fabricated/sent', () async {
+      final adapter = _FakeAdapter(
+        (options) async => _jsonBody({
+          'success': true,
+          'data': {'followUp': createdFollowUpResponse()},
+        }, 201),
+      );
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await PeopleApi(dio).createFollowUp(organizationId: 'org-1', personId: 'p1', title: 'New follow-up');
+
+      final body = adapter.lastRequest!.data as Map<String, dynamic>;
+      expect(body.containsKey('description'), isFalse);
+      expect(body.containsKey('dueDate'), isFalse);
+      expect(body.containsKey('assignedTo'), isFalse, reason: 'no authoritative assignee selector is implemented');
+    });
+
+    test('a non-empty description is trimmed and sent', () async {
+      final adapter = _FakeAdapter(
+        (options) async => _jsonBody({
+          'success': true,
+          'data': {'followUp': createdFollowUpResponse()},
+        }, 201),
+      );
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await PeopleApi(
+        dio,
+      ).createFollowUp(organizationId: 'org-1', personId: 'p1', title: 'New follow-up', description: '  details  ');
+
+      final body = adapter.lastRequest!.data as Map<String, dynamic>;
+      expect(body['description'], 'details');
+    });
+
+    test('a whitespace-only description is omitted, never sent as an empty string', () async {
+      final adapter = _FakeAdapter(
+        (options) async => _jsonBody({
+          'success': true,
+          'data': {'followUp': createdFollowUpResponse()},
+        }, 201),
+      );
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await PeopleApi(
+        dio,
+      ).createFollowUp(organizationId: 'org-1', personId: 'p1', title: 'New follow-up', description: '   ');
+
+      final body = adapter.lastRequest!.data as Map<String, dynamic>;
+      expect(body.containsKey('description'), isFalse);
+    });
+
+    test('title is trimmed', () async {
+      final adapter = _FakeAdapter(
+        (options) async => _jsonBody({
+          'success': true,
+          'data': {'followUp': createdFollowUpResponse()},
+        }, 201),
+      );
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await PeopleApi(dio).createFollowUp(organizationId: 'org-1', personId: 'p1', title: '  New follow-up  ');
+
+      final body = adapter.lastRequest!.data as Map<String, dynamic>;
+      expect(body['title'], 'New follow-up');
+    });
+
+    test('a supplied dueDate is converted to its UTC-equivalent absolute instant (Z-suffixed, no local offset)', () async {
+      final adapter = _FakeAdapter(
+        (options) async => _jsonBody({
+          'success': true,
+          'data': {'followUp': createdFollowUpResponse()},
+        }, 201),
+      );
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      // A local (non-UTC) DateTime with an explicit, non-midnight
+      // wall-clock time — exactly the shape create_follow_up_screen.dart's
+      // due picker now always produces (Product Task 043A: a due instant
+      // only ever exists once the user has explicitly selected both a
+      // calendar date AND a wall-clock time; this method performs only the
+      // final UTC serialization step and never invents a time component).
+      final selectedLocalDateTime = DateTime(2026, 8, 2, 14, 30);
+
+      await PeopleApi(dio).createFollowUp(
+        organizationId: 'org-1',
+        personId: 'p1',
+        title: 'New follow-up',
+        dueDate: selectedLocalDateTime,
+      );
+
+      final body = adapter.lastRequest!.data as Map<String, dynamic>;
+      final sentDueDate = body['dueDate'] as String;
+      expect(sentDueDate, selectedLocalDateTime.toUtc().toIso8601String());
+      expect(sentDueDate, endsWith('Z'));
+      expect(DateTime.parse(sentDueDate), selectedLocalDateTime.toUtc());
+    });
+
+    test('parses the Create Follow-up response through the existing envelope authority', () async {
+      final adapter = _FakeAdapter(
+        (options) async => _jsonBody({
+          'success': true,
+          'data': {'followUp': createdFollowUpResponse()},
+        }, 201),
+      );
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      final created = await PeopleApi(
+        dio,
+      ).createFollowUp(organizationId: 'org-1', personId: 'p1', title: 'New follow-up');
+
+      expect(created.id, 'fu-new');
+      expect(created.status, FollowUpStatus.pending);
+      expect(created.assignedTo, isNull);
+    });
+
+    test('surfaces a mapped backend error through the existing error authority', () async {
+      final adapter = _FakeAdapter(
+        (options) async => _jsonBody({
+          'success': false,
+          'error': {'code': 'VALIDATION_ERROR', 'message': 'Invalid request.'},
+        }, 422),
+      );
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await expectLater(
+        PeopleApi(dio).createFollowUp(organizationId: 'org-1', personId: 'p1', title: 'New follow-up'),
+        throwsA(isA<Exception>()),
+      );
+    });
+  });
 }

@@ -23,6 +23,10 @@ typedef _SummaryHandler = Future<AttendanceSummary> Function({
   required String organizationId,
   required String personId,
 });
+typedef _FollowUpsHandler = Future<FollowUpListResult> Function({
+  required String organizationId,
+  required String personId,
+});
 
 class _ScriptedPeopleApi extends PeopleApi {
   _ScriptedPeopleApi({
@@ -30,12 +34,15 @@ class _ScriptedPeopleApi extends PeopleApi {
     required this.journeyHandler,
     required this.stagesHandler,
     required this.summaryHandler,
+    required this.followUpsHandler,
   }) : super(Dio());
 
   _DetailHandler detailHandler;
   _JourneyHandler journeyHandler;
   _StagesHandler stagesHandler;
   _SummaryHandler summaryHandler;
+  _FollowUpsHandler followUpsHandler;
+  int followUpsCallCount = 0;
 
   @override
   Future<PeoplePage> list({
@@ -61,6 +68,12 @@ class _ScriptedPeopleApi extends PeopleApi {
   @override
   Future<AttendanceSummary> attendanceSummary({required String organizationId, required String personId}) =>
       summaryHandler(organizationId: organizationId, personId: personId);
+
+  @override
+  Future<FollowUpListResult> personFollowUps({required String organizationId, required String personId}) {
+    followUpsCallCount++;
+    return followUpsHandler(organizationId: organizationId, personId: personId);
+  }
 }
 
 class _FakeOrganizationContextController extends OrganizationContextController {
@@ -118,11 +131,13 @@ PersonDetail _fullDetail({
 const _emptyJourney = PersonJourneyView(currentStage: null, history: []);
 const _emptyStages = <JourneyStageListEntry>[];
 const _zeroSummary = AttendanceSummary(totalCount: 0, currentMonthCount: 0);
+const _emptyFollowUps = FollowUpListResult(followUps: [], nextCursor: null);
 
 class _Harness {
-  _Harness(this.router, this.orgController);
+  _Harness(this.router, this.orgController, this.api);
   final GoRouter router;
   final _FakeOrganizationContextController orgController;
+  final _ScriptedPeopleApi api;
 }
 
 Future<_Harness> _pumpProfileScreen(
@@ -131,6 +146,7 @@ Future<_Harness> _pumpProfileScreen(
   _JourneyHandler? journeyHandler,
   _StagesHandler? stagesHandler,
   _SummaryHandler? summaryHandler,
+  _FollowUpsHandler? followUpsHandler,
   OrganizationContextState initialOrg = _orgA,
   bool settle = true,
 }) async {
@@ -139,6 +155,7 @@ Future<_Harness> _pumpProfileScreen(
     journeyHandler: journeyHandler ?? ({required organizationId, required personId}) async => _emptyJourney,
     stagesHandler: stagesHandler ?? ({required organizationId}) async => _emptyStages,
     summaryHandler: summaryHandler ?? ({required organizationId, required personId}) async => _zeroSummary,
+    followUpsHandler: followUpsHandler ?? ({required organizationId, required personId}) async => _emptyFollowUps,
   );
   final orgController = _FakeOrganizationContextController(initialOrg);
 
@@ -178,7 +195,7 @@ Future<_Harness> _pumpProfileScreen(
     // settle (it would time out); a single pump renders the current frame.
     await tester.pump();
   }
-  return _Harness(router, orgController);
+  return _Harness(router, orgController, api);
 }
 
 void main() {
@@ -336,12 +353,13 @@ void main() {
     }
   });
 
-  testWidgets('Groups, Recent Activity, and Upcoming Follow-ups are omitted entirely', (WidgetTester tester) async {
+  testWidgets('Groups and Recent Activity are omitted entirely (Upcoming Follow-ups is real as of Product Task 043)', (
+    WidgetTester tester,
+  ) async {
     await _pumpProfileScreen(tester, detailHandler: ({required organizationId, required personId}) async => _fullDetail());
 
     expect(find.text('Groups'), findsNothing);
     expect(find.text('Recent Activity'), findsNothing);
-    expect(find.text('Upcoming Follow-ups'), findsNothing);
   });
 
   testWidgets('Call/Message/Email/More are visible but non-interactive', (WidgetTester tester) async {
@@ -362,11 +380,13 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Create Follow-up and Edit Person render disabled and do not navigate', (WidgetTester tester) async {
+  testWidgets('Create Follow-up is interactive (Product Task 043); Edit Person remains disabled', (
+    WidgetTester tester,
+  ) async {
     await _pumpProfileScreen(tester, detailHandler: ({required organizationId, required personId}) async => _fullDetail());
 
     final createButton = tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Create Follow-up'));
-    expect(createButton.onPressed, isNull);
+    expect(createButton.onPressed, isNotNull);
 
     final editButton = tester.widget<OutlinedButton>(find.widgetWithText(OutlinedButton, 'Edit Person'));
     expect(editButton.onPressed, isNull);
@@ -471,5 +491,204 @@ void main() {
     expect(find.text('Could not load this person.'), findsOneWidget);
     expect(find.text('Ada Lovelace'), findsNothing);
     expect(find.widgetWithText(OutlinedButton, 'Retry'), findsOneWidget);
+  });
+
+  group('Upcoming Follow-ups region (Product Task 043)', () {
+    FollowUpPersonRef personRef() => const FollowUpPersonRef(id: 'p1', firstName: 'Ada', lastName: 'Lovelace');
+
+    FollowUpSummary followUp(
+      String id, {
+      FollowUpStatus status = FollowUpStatus.pending,
+      String title = 'Call to check in',
+      DateTime? dueDate,
+      FollowUpPersonRef? assignedTo,
+    }) => FollowUpSummary(
+      id: id,
+      title: title,
+      description: null,
+      dueDate: dueDate,
+      status: status,
+      completedAt: null,
+      person: personRef(),
+      assignedTo: assignedTo,
+    );
+
+    testWidgets('renders the Upcoming Follow-ups region with a real PENDING follow-up', (WidgetTester tester) async {
+      await _pumpProfileScreen(
+        tester,
+        detailHandler: ({required organizationId, required personId}) async => _fullDetail(),
+        followUpsHandler: ({required organizationId, required personId}) async =>
+            FollowUpListResult(followUps: [followUp('f1', title: 'Schedule a home visit')], nextCursor: null),
+      );
+
+      expect(find.text('Upcoming Follow-ups'), findsOneWidget);
+      expect(find.text('Schedule a home visit'), findsOneWidget);
+    });
+
+    testWidgets('renders a real IN_PROGRESS follow-up', (WidgetTester tester) async {
+      await _pumpProfileScreen(
+        tester,
+        detailHandler: ({required organizationId, required personId}) async => _fullDetail(),
+        followUpsHandler: ({required organizationId, required personId}) async => FollowUpListResult(
+          followUps: [followUp('f1', status: FollowUpStatus.inProgress, title: 'Follow up on donation')],
+          nextCursor: null,
+        ),
+      );
+
+      expect(find.text('Follow up on donation'), findsOneWidget);
+    });
+
+    testWidgets('a COMPLETED follow-up does not render; no invented UPCOMING status exists', (
+      WidgetTester tester,
+    ) async {
+      await _pumpProfileScreen(
+        tester,
+        detailHandler: ({required organizationId, required personId}) async => _fullDetail(),
+        followUpsHandler: ({required organizationId, required personId}) async => FollowUpListResult(
+          followUps: [
+            followUp('f-pending', title: 'Pending item'),
+            followUp('f-completed', status: FollowUpStatus.completed, title: 'Completed item'),
+          ],
+          nextCursor: null,
+        ),
+      );
+
+      expect(find.text('Pending item'), findsOneWidget);
+      expect(find.text('Completed item'), findsNothing);
+      expect(find.text('UPCOMING'), findsNothing);
+    });
+
+    testWidgets('no fake count is shown, and hasMore never produces an exhaustive total claim', (
+      WidgetTester tester,
+    ) async {
+      await _pumpProfileScreen(
+        tester,
+        detailHandler: ({required organizationId, required personId}) async => _fullDetail(),
+        followUpsHandler: ({required organizationId, required personId}) async =>
+            FollowUpListResult(followUps: [followUp('f1')], nextCursor: 'cursor-1'),
+      );
+
+      for (final fakeCount in ['1 scheduled follow-up', '2 scheduled follow-ups']) {
+        expect(find.textContaining(fakeCount), findsNothing);
+      }
+      expect(find.text('More follow-ups exist for this person.'), findsOneWidget);
+    });
+
+    testWidgets('due date renders when present and is omitted when null (never fabricated)', (
+      WidgetTester tester,
+    ) async {
+      await _pumpProfileScreen(
+        tester,
+        detailHandler: ({required organizationId, required personId}) async => _fullDetail(),
+        followUpsHandler: ({required organizationId, required personId}) async => FollowUpListResult(
+          followUps: [
+            followUp('f-with-date', title: 'Has a date', dueDate: DateTime.utc(2026, 8, 2, 9)),
+            followUp('f-without-date', title: 'No date'),
+          ],
+          nextCursor: null,
+        ),
+      );
+
+      expect(find.textContaining('Due'), findsOneWidget, reason: 'only the follow-up with a real dueDate shows one');
+    });
+
+    testWidgets('assignee renders when present and is omitted when null (never fabricated Unassigned)', (
+      WidgetTester tester,
+    ) async {
+      await _pumpProfileScreen(
+        tester,
+        detailHandler: ({required organizationId, required personId}) async => _fullDetail(),
+        followUpsHandler: ({required organizationId, required personId}) async => FollowUpListResult(
+          followUps: [
+            followUp(
+              'f-assigned',
+              title: 'Assigned item',
+              assignedTo: const FollowUpPersonRef(id: 'u1', firstName: 'Grace', lastName: 'Hopper'),
+            ),
+            followUp('f-unassigned', title: 'Unassigned item'),
+          ],
+          nextCursor: null,
+        ),
+      );
+
+      expect(find.text('Assigned to Grace Hopper'), findsOneWidget);
+      expect(find.text('Unassigned'), findsNothing);
+    });
+
+    testWidgets('Follow-up rows are non-interactive: no chevron, no completion control, no detail navigation', (
+      WidgetTester tester,
+    ) async {
+      // A tall viewport so the tap target is reachable without scrolling
+      // (mirrors add_person_screen_test.dart's convention).
+      tester.view.physicalSize = const Size(400, 2000);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await _pumpProfileScreen(
+        tester,
+        detailHandler: ({required organizationId, required personId}) async => _fullDetail(),
+        followUpsHandler: ({required organizationId, required personId}) async =>
+            FollowUpListResult(followUps: [followUp('f1', title: 'Tap-test item')], nextCursor: null),
+      );
+
+      expect(find.byIcon(Icons.chevron_right), findsNothing);
+      expect(find.byType(Checkbox), findsNothing);
+
+      await tester.tap(find.text('Tap-test item'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Tap-test item'), findsOneWidget, reason: 'tapping a row must not navigate anywhere');
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('truthful empty state when no non-completed follow-ups are returned', (WidgetTester tester) async {
+      await _pumpProfileScreen(
+        tester,
+        detailHandler: ({required organizationId, required personId}) async => _fullDetail(),
+        followUpsHandler: ({required organizationId, required personId}) async => const FollowUpListResult(
+          followUps: [],
+          nextCursor: null,
+        ),
+      );
+
+      expect(find.text('No follow-ups are currently scheduled.'), findsOneWidget);
+      expect(find.textContaining('never had'), findsNothing);
+    });
+
+    testWidgets('region loading does not replace the rest of Profile', (WidgetTester tester) async {
+      final followUpGate = Completer<FollowUpListResult>();
+      await _pumpProfileScreen(
+        tester,
+        detailHandler: ({required organizationId, required personId}) async => _fullDetail(),
+        followUpsHandler: ({required organizationId, required personId}) => followUpGate.future,
+        // The Follow-up region's own CircularProgressIndicator never
+        // settles while followUpGate is unresolved, so pumpAndSettle()
+        // would hang — pump explicitly instead to drain the (real-timer-
+        // free) Detail/Journey/Stages/Attendance microtask chain.
+        settle: false,
+      );
+      await tester.pump();
+
+      // Profile core rendered even while the Follow-up region is still loading.
+      expect(find.text('Ada Lovelace'), findsOneWidget);
+      expect(find.text('Personal Information'), findsOneWidget);
+      expect(find.text('Upcoming Follow-ups'), findsOneWidget);
+
+      followUpGate.complete(const FollowUpListResult(followUps: [], nextCursor: null));
+      await tester.pumpAndSettle();
+    });
+
+    testWidgets('region error does not replace the rest of Profile', (WidgetTester tester) async {
+      await _pumpProfileScreen(
+        tester,
+        detailHandler: ({required organizationId, required personId}) async => _fullDetail(),
+        followUpsHandler: ({required organizationId, required personId}) async => throw Exception('boom'),
+      );
+
+      expect(find.text('Ada Lovelace'), findsOneWidget, reason: 'Profile core must remain visible');
+      expect(find.text('Personal Information'), findsOneWidget);
+      expect(find.text('Could not load follow-ups.'), findsOneWidget);
+    });
   });
 }

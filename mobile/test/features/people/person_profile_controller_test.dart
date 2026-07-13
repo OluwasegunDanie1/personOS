@@ -20,6 +20,10 @@ typedef _SummaryHandler = Future<AttendanceSummary> Function({
   required String organizationId,
   required String personId,
 });
+typedef _FollowUpsHandler = Future<FollowUpListResult> Function({
+  required String organizationId,
+  required String personId,
+});
 
 class _ScriptedPeopleApi extends PeopleApi {
   _ScriptedPeopleApi({
@@ -27,17 +31,20 @@ class _ScriptedPeopleApi extends PeopleApi {
     required this.journeyHandler,
     required this.stagesHandler,
     required this.summaryHandler,
+    required this.followUpsHandler,
   }) : super(Dio());
 
   _DetailHandler detailHandler;
   _JourneyHandler journeyHandler;
   _StagesHandler stagesHandler;
   _SummaryHandler summaryHandler;
+  _FollowUpsHandler followUpsHandler;
 
   int detailCallCount = 0;
   int journeyCallCount = 0;
   int stagesCallCount = 0;
   int summaryCallCount = 0;
+  int followUpsCallCount = 0;
 
   @override
   Future<PeoplePage> list({
@@ -70,6 +77,12 @@ class _ScriptedPeopleApi extends PeopleApi {
   Future<AttendanceSummary> attendanceSummary({required String organizationId, required String personId}) {
     summaryCallCount++;
     return summaryHandler(organizationId: organizationId, personId: personId);
+  }
+
+  @override
+  Future<FollowUpListResult> personFollowUps({required String organizationId, required String personId}) {
+    followUpsCallCount++;
+    return followUpsHandler(organizationId: organizationId, personId: personId);
   }
 }
 
@@ -112,6 +125,24 @@ PersonDetail _detail({String id = 'person-1', String? avatarUrl}) => PersonDetai
 const _journey = PersonJourneyView(currentStage: null, history: []);
 const _stages = <JourneyStageListEntry>[];
 const _summary = AttendanceSummary(totalCount: 0, currentMonthCount: 0);
+const _emptyFollowUps = FollowUpListResult(followUps: [], nextCursor: null);
+
+FollowUpPersonRef _personRef(String id) => FollowUpPersonRef(id: id, firstName: 'Ada', lastName: 'Lovelace');
+
+FollowUpSummary _followUp(
+  String id, {
+  FollowUpStatus status = FollowUpStatus.pending,
+  String title = 'Follow up',
+}) => FollowUpSummary(
+  id: id,
+  title: title,
+  description: null,
+  dueDate: null,
+  status: status,
+  completedAt: null,
+  person: _personRef('person-1'),
+  assignedTo: null,
+);
 
 void main() {
   late _ScriptedPeopleApi api;
@@ -124,12 +155,14 @@ void main() {
     _JourneyHandler? journeyHandler,
     _StagesHandler? stagesHandler,
     _SummaryHandler? summaryHandler,
+    _FollowUpsHandler? followUpsHandler,
   }) {
     api = _ScriptedPeopleApi(
       detailHandler: detailHandler ?? ({required organizationId, required personId}) async => _detail(),
       journeyHandler: journeyHandler ?? ({required organizationId, required personId}) async => _journey,
       stagesHandler: stagesHandler ?? ({required organizationId}) async => _stages,
       summaryHandler: summaryHandler ?? ({required organizationId, required personId}) async => _summary,
+      followUpsHandler: followUpsHandler ?? ({required organizationId, required personId}) async => _emptyFollowUps,
     );
     orgController = _FakeOrganizationContextController(initialOrgState);
     container = ProviderContainer(
@@ -258,5 +291,191 @@ void main() {
 
     expect(state1.detail!.id, 'person-1');
     expect(state2.detail!.id, 'person-2');
+  });
+
+  group('Profile Follow-up region', () {
+    test('loads Follow-ups for the current person and selected organization using person_id, dueDate_asc, limit 100', () async {
+      buildContainer(
+        initialOrgState: _orgA,
+        followUpsHandler: ({required organizationId, required personId}) async =>
+            FollowUpListResult(followUps: [_followUp('f1')], nextCursor: null),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      final state = container.read(personProfileControllerProvider('person-1'));
+      expect(state.followUpStatus, FollowUpRegionStatus.loaded);
+      expect(state.followUps!.single.id, 'f1');
+      expect(api.followUpsCallCount, 1);
+    });
+
+    test('excludes COMPLETED records; retains PENDING and IN_PROGRESS', () async {
+      buildContainer(
+        initialOrgState: _orgA,
+        followUpsHandler: ({required organizationId, required personId}) async => FollowUpListResult(
+          followUps: [
+            _followUp('f-pending', status: FollowUpStatus.pending),
+            _followUp('f-in-progress', status: FollowUpStatus.inProgress),
+            _followUp('f-completed', status: FollowUpStatus.completed),
+          ],
+          nextCursor: null,
+        ),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      final ids = container.read(personProfileControllerProvider('person-1')).followUps!.map((f) => f.id);
+      expect(ids, containsAll(['f-pending', 'f-in-progress']));
+      expect(ids.contains('f-completed'), isFalse);
+    });
+
+    test('retains hasMore when nextCursor is non-null', () async {
+      buildContainer(
+        initialOrgState: _orgA,
+        followUpsHandler: ({required organizationId, required personId}) async =>
+            FollowUpListResult(followUps: [_followUp('f1')], nextCursor: 'cursor-1'),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(container.read(personProfileControllerProvider('person-1')).followUpsHasMore, isTrue);
+    });
+
+    test('hasMore is false when nextCursor is null', () async {
+      buildContainer(initialOrgState: _orgA);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(container.read(personProfileControllerProvider('person-1')).followUpsHasMore, isFalse);
+    });
+
+    test('Follow-up loading is region-specific and does not block Profile core from loading', () async {
+      final followUpGate = Completer<FollowUpListResult>();
+      buildContainer(
+        initialOrgState: _orgA,
+        followUpsHandler: ({required organizationId, required personId}) => followUpGate.future,
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      final state = container.read(personProfileControllerProvider('person-1'));
+      expect(state.status, ProfileLoadStatus.loaded, reason: 'core must load independently of the Follow-up region');
+      expect(state.followUpStatus, FollowUpRegionStatus.loading);
+
+      followUpGate.complete(const FollowUpListResult(followUps: [], nextCursor: null));
+      await Future<void>.delayed(Duration.zero);
+    });
+
+    test('a Follow-up failure is region-specific and does not erase valid Profile core data', () async {
+      buildContainer(
+        initialOrgState: _orgA,
+        followUpsHandler: ({required organizationId, required personId}) async => throw Exception('boom'),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      final state = container.read(personProfileControllerProvider('person-1'));
+      expect(state.followUpStatus, FollowUpRegionStatus.error);
+      expect(state.followUpErrorMessage, isNotNull);
+      expect(state.status, ProfileLoadStatus.loaded, reason: 'core Detail/Journey/Stages/Attendance must remain valid');
+      expect(state.detail, isNotNull);
+      expect(state.journey, isNotNull);
+      expect(state.stages, isNotNull);
+      expect(state.attendanceSummary, isNotNull);
+    });
+
+    test('a stale Organization A Follow-up success is discarded after switching to Organization B', () async {
+      final followUpGate = Completer<FollowUpListResult>();
+      buildContainer(
+        initialOrgState: _orgA,
+        followUpsHandler: ({required organizationId, required personId}) => followUpGate.future,
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      orgController.emit(_orgB);
+      await Future<void>.delayed(Duration.zero);
+      expect(container.read(personProfileControllerProvider('person-1')).shouldClose, isTrue);
+
+      followUpGate.complete(FollowUpListResult(followUps: [_followUp('stale-f1')], nextCursor: null));
+      await Future<void>.delayed(Duration.zero);
+
+      final state = container.read(personProfileControllerProvider('person-1'));
+      expect(state.followUpStatus, FollowUpRegionStatus.loading, reason: 'the stale org-a success must never apply');
+      expect(state.followUps, isNull);
+    });
+
+    test('a stale Organization A Follow-up error is discarded after switching to Organization B', () async {
+      final followUpGate = Completer<FollowUpListResult>();
+      buildContainer(
+        initialOrgState: _orgA,
+        followUpsHandler: ({required organizationId, required personId}) => followUpGate.future,
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      orgController.emit(_orgB);
+      await Future<void>.delayed(Duration.zero);
+
+      followUpGate.completeError(Exception('stale network failure'));
+      await Future<void>.delayed(Duration.zero);
+
+      final state = container.read(personProfileControllerProvider('person-1'));
+      expect(state.followUpStatus, FollowUpRegionStatus.loading, reason: 'the stale org-a error must never apply');
+      expect(state.followUpErrorMessage, isNull);
+    });
+
+    test('an older Follow-up refresh cannot overwrite newer Follow-up state', () async {
+      final staleGate = Completer<FollowUpListResult>();
+      // Deterministic request-entry signal (Product Task 037B's established
+      // convention): proves the initial (generation 1) load has genuinely
+      // reached the fake API and is gated, rather than racing two async
+      // chains against each other via implicit microtask-ordering timing.
+      final initialEntered = Completer<void>();
+      var callIndex = 0;
+      buildContainer(
+        initialOrgState: _orgA,
+        followUpsHandler: ({required organizationId, required personId}) {
+          callIndex++;
+          if (callIndex == 1) {
+            if (!initialEntered.isCompleted) initialEntered.complete();
+            return staleGate.future;
+          }
+          return Future.value(FollowUpListResult(followUps: [_followUp('fresh')], nextCursor: null));
+        },
+      );
+
+      await initialEntered.future;
+
+      final notifier = container.read(personProfileControllerProvider('person-1').notifier);
+      await notifier.refreshFollowUps();
+
+      expect(
+        container.read(personProfileControllerProvider('person-1')).followUps!.map((f) => f.id),
+        ['fresh'],
+        reason: 'the newer refresh must be authoritative before the stale generation-1 response is released',
+      );
+
+      staleGate.complete(FollowUpListResult(followUps: [_followUp('stale')], nextCursor: null));
+      await Future<void>.delayed(Duration.zero);
+
+      final ids = container.read(personProfileControllerProvider('person-1')).followUps!.map((f) => f.id);
+      expect(
+        ids,
+        ['fresh'],
+        reason: 'the stale generation-1 response must not overwrite the newer refresh state',
+      );
+    });
+
+    test('refreshFollowUps performs a real new GET request (the mechanism Create Follow-up success uses)', () async {
+      var callCount = 0;
+      buildContainer(
+        initialOrgState: _orgA,
+        followUpsHandler: ({required organizationId, required personId}) async {
+          callCount++;
+          if (callCount == 1) return const FollowUpListResult(followUps: [], nextCursor: null);
+          return FollowUpListResult(followUps: [_followUp('created-1')], nextCursor: null);
+        },
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(container.read(personProfileControllerProvider('person-1')).followUps, isEmpty);
+
+      await container.read(personProfileControllerProvider('person-1').notifier).refreshFollowUps();
+
+      expect(api.followUpsCallCount, 2);
+      expect(container.read(personProfileControllerProvider('person-1')).followUps!.single.id, 'created-1');
+    });
   });
 }

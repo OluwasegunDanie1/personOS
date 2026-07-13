@@ -10,6 +10,7 @@ import '../../features/messages/messages_screen.dart';
 import '../../features/organizations/organization_context_controller.dart';
 import '../../features/organizations/organization_setup_screen.dart';
 import '../../features/people/add_person_screen.dart';
+import '../../features/people/create_follow_up_screen.dart';
 import '../../features/people/people_screen.dart';
 import '../../features/people/person_profile_screen.dart';
 import '../../features/workspace/workspace_screen.dart';
@@ -95,6 +96,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/people/:personId',
         builder: (context, state) => PersonProfileScreen(personId: state.pathParameters['personId']!),
+      ),
+      // Also pushed above the shell — personId only, no organizationId, no
+      // PersonDetail passed as route state. The Create Follow-up screen has
+      // its own back affordance (Product Task 043).
+      GoRoute(
+        path: '/people/:personId/follow-ups/create',
+        builder: (context, state) => CreateFollowUpScreen(personId: state.pathParameters['personId']!),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) => PrimaryNavigationShell(navigationShell: navigationShell),

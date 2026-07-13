@@ -124,4 +124,56 @@ class PeopleApi {
     final data = unwrapEnvelope(response) as Map<String, dynamic>;
     return AttendanceSummary.fromJson(data['attendanceSummary'] as Map<String, dynamic>);
   }
+
+  /// Integrates the real, implemented GET /organizations/:organizationId/follow-ups
+  /// endpoint (Product Task 043), scoped to exactly one bounded person-scoped
+  /// page: person_id, sort=dueDate_asc (the real approved sort value — not
+  /// "due_date_asc"; confirmed against follow-ups.constants.ts and
+  /// 13_API_Specification.md), limit=100. No status filter is ever sent; the
+  /// Profile "non-completed" presentation filter is applied client-side over
+  /// the real returned records (never as a request parameter, never inventing
+  /// an UPCOMING backend value). Never recursively follows nextCursor.
+  Future<FollowUpListResult> personFollowUps({required String organizationId, required String personId}) async {
+    final response = await _dio.get<dynamic>(
+      '/organizations/$organizationId/follow-ups',
+      queryParameters: {'person_id': personId, 'sort': 'dueDate_asc', 'limit': 100},
+    );
+    final data = unwrapEnvelope(response) as Map<String, dynamic>;
+    return FollowUpListResult.fromJson(data);
+  }
+
+  /// Integrates the real, implemented POST /organizations/:organizationId/follow-ups
+  /// endpoint. Serializes only the approved Create Follow-Up fields (personId,
+  /// title, optional description/dueDate) — no assignedTo (Product Task 043's
+  /// assignee ruling: no authoritative organization-member read boundary
+  /// exists yet, so the field is never sent, never hardcoded, never fabricated).
+  /// dueDate, when supplied, must already be a fully-resolved instant —
+  /// i.e. a local DateTime built from the user's own explicitly selected
+  /// calendar date AND wall-clock time (create_follow_up_screen.dart's due
+  /// picker). This method only performs the final .toUtc() serialization
+  /// step; it never invents, defaults, or infers any time component (no
+  /// midnight, no noon, no current-time, no date-only semantic) — Product
+  /// Task 043A's due-instant ruling explicitly rejected that behavior.
+  Future<FollowUpSummary> createFollowUp({
+    required String organizationId,
+    required String personId,
+    required String title,
+    String? description,
+    DateTime? dueDate,
+  }) async {
+    final trimmedDescription = description?.trim();
+
+    final response = await _dio.post<dynamic>(
+      '/organizations/$organizationId/follow-ups',
+      data: {
+        'personId': personId,
+        'title': title.trim(),
+        if (trimmedDescription != null && trimmedDescription.isNotEmpty) 'description': trimmedDescription,
+        if (dueDate != null) 'dueDate': dueDate.toUtc().toIso8601String(),
+      },
+    );
+
+    final data = unwrapEnvelope(response) as Map<String, dynamic>;
+    return FollowUpSummary.fromJson(data['followUp'] as Map<String, dynamic>);
+  }
 }

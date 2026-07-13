@@ -96,8 +96,15 @@ class _ProfileBody extends ConsumerWidget {
               _JourneyStageSection(journey: state.journey, stages: state.stages ?? const []),
               const SizedBox(height: 12),
               const _NotesStructuralRow(),
+              const SizedBox(height: 12),
+              _UpcomingFollowUpsSection(
+                personId: personId,
+                status: state.followUpStatus,
+                followUps: state.followUps,
+                hasMore: state.followUpsHasMore,
+              ),
               const SizedBox(height: 24),
-              const _BottomActions(),
+              _BottomActions(personId: personId),
             ],
           ),
         );
@@ -590,11 +597,14 @@ class _NotesStructuralRow extends StatelessWidget {
   }
 }
 
-/// Create Follow-up / Edit Person: both visually present but disabled
-/// (onPressed: null renders Flutter's standard disabled button treatment),
-/// per Task 041 rulings M/N — neither is implemented in this first slice.
+/// Create Follow-up is now interactive (Product Task 043), pushing
+/// /people/:personId/follow-ups/create. Edit Person remains visually present
+/// but disabled (onPressed: null renders Flutter's standard disabled button
+/// treatment), per Task 041 ruling M — not implemented in this task.
 class _BottomActions extends StatelessWidget {
-  const _BottomActions();
+  const _BottomActions({required this.personId});
+
+  final String personId;
 
   @override
   Widget build(BuildContext context) {
@@ -604,7 +614,7 @@ class _BottomActions extends StatelessWidget {
           width: double.infinity,
           height: 52,
           child: FilledButton(
-            onPressed: null,
+            onPressed: () => context.push('/people/$personId/follow-ups/create'),
             style: FilledButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
             child: const Text('Create Follow-up', style: TextStyle(fontWeight: FontWeight.w700)),
           ),
@@ -619,6 +629,133 @@ class _BottomActions extends StatelessWidget {
             child: const Text('Edit Person', style: TextStyle(fontWeight: FontWeight.w700)),
           ),
         ),
+      ],
+    );
+  }
+}
+
+/// "Upcoming Follow-ups" region (design/ui-reference/7.png panel 2's frozen
+/// section identity). Renders only real, non-completed (PENDING/IN_PROGRESS)
+/// Follow-up records from one bounded person-scoped page — never a fake
+/// count, never an exhaustive-total claim when hasMore is true, never an
+/// invented UPCOMING status. Rows are non-interactive: no chevron, no
+/// navigation to a non-existent detail screen, no completion control.
+class _UpcomingFollowUpsSection extends ConsumerWidget {
+  const _UpcomingFollowUpsSection({
+    required this.personId,
+    required this.status,
+    required this.followUps,
+    required this.hasMore,
+  });
+
+  final String personId;
+  final FollowUpRegionStatus status;
+  final List<FollowUpSummary>? followUps;
+  final bool hasMore;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    switch (status) {
+      case FollowUpRegionStatus.loading:
+        return const _SectionCard(
+          icon: Icons.schedule_outlined,
+          title: 'Upcoming Follow-ups',
+          child: Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 4),
+              child: SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2)),
+            ),
+          ),
+        );
+      case FollowUpRegionStatus.error:
+        return _SectionCard(
+          icon: Icons.schedule_outlined,
+          title: 'Upcoming Follow-ups',
+          child: Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Could not load follow-ups.',
+                  style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                ),
+              ),
+              TextButton(
+                onPressed: () => ref.read(personProfileControllerProvider(personId).notifier).refreshFollowUps(),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        );
+      case FollowUpRegionStatus.loaded:
+        final visible = followUps ?? const <FollowUpSummary>[];
+        if (visible.isEmpty) {
+          return const _SectionCard(
+            icon: Icons.schedule_outlined,
+            title: 'Upcoming Follow-ups',
+            child: Text(
+              'No follow-ups are currently scheduled.',
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            ),
+          );
+        }
+        return _SectionCard(
+          icon: Icons.schedule_outlined,
+          title: 'Upcoming Follow-ups',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var i = 0; i < visible.length; i++) ...[
+                if (i > 0) const Padding(padding: EdgeInsets.symmetric(vertical: 8), child: Divider(height: 1)),
+                _FollowUpRow(followUp: visible[i]),
+              ],
+              // hasMore never produces a total-count claim — the bounded
+              // first page's records are simply shown as-is, with an honest
+              // "more exist" note instead of a fabricated "{N} total".
+              if (hasMore) ...[
+                const SizedBox(height: 8),
+                const Text(
+                  'More follow-ups exist for this person.',
+                  style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                ),
+              ],
+            ],
+          ),
+        );
+    }
+  }
+}
+
+class _FollowUpRow extends StatelessWidget {
+  const _FollowUpRow({required this.followUp});
+
+  final FollowUpSummary followUp;
+
+  @override
+  Widget build(BuildContext context) {
+    final dueDate = followUp.dueDate;
+    final assignee = followUp.assignedTo;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          followUp.title,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+        ),
+        if (dueDate != null) ...[
+          const SizedBox(height: 2),
+          Text(
+            'Due ${_formatDateOnly(dueDate.toLocal())}',
+            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
+        ],
+        if (assignee != null) ...[
+          const SizedBox(height: 2),
+          Text(
+            'Assigned to ${assignee.displayName}',
+            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
+        ],
       ],
     );
   }

@@ -367,3 +367,108 @@ class AttendanceSummary {
     currentMonthCount: json['currentMonthCount'] as int,
   );
 }
+
+/// Mirrors the real, implemented Follow-Up person/assignedTo reference shape
+/// exactly: {id, firstName, lastName}. Used for both FollowUpSummary.person
+/// and FollowUpSummary.assignedTo (13_API_Specification.md's Follow-Up
+/// Endpoints section — both fields share this identical shape).
+class FollowUpPersonRef {
+  const FollowUpPersonRef({required this.id, required this.firstName, required this.lastName});
+
+  final String id;
+  final String firstName;
+  final String lastName;
+
+  String get displayName => '$firstName $lastName'.trim();
+
+  factory FollowUpPersonRef.fromJson(Map<String, dynamic> json) => FollowUpPersonRef(
+    id: json['id'] as String,
+    firstName: json['firstName'] as String,
+    lastName: json['lastName'] as String,
+  );
+}
+
+/// The closed v1 accepted API values for FollowUp.status are exactly PENDING,
+/// IN_PROGRESS, COMPLETED (13_API_Specification.md's "Follow-Up Status"
+/// section). There is no UPCOMING, OVERDUE, CANCELLED, SNOOZED, BLOCKED, or
+/// ESCALATED value — "upcoming" is a Profile-presentation-level concept
+/// (non-completed), never a parsed or transmitted status value.
+enum FollowUpStatus {
+  pending,
+  inProgress,
+  completed;
+
+  static FollowUpStatus fromApiValue(String value) {
+    switch (value) {
+      case 'PENDING':
+        return FollowUpStatus.pending;
+      case 'IN_PROGRESS':
+        return FollowUpStatus.inProgress;
+      case 'COMPLETED':
+        return FollowUpStatus.completed;
+      default:
+        throw ArgumentError('Unknown FollowUp.status value: $value');
+    }
+  }
+}
+
+/// Mirrors the real, implemented List/Create Follow-Up response shape
+/// exactly: {id, title, description, dueDate, status, completedAt, person,
+/// assignedTo}. dueDate/completedAt are absolute-instant timestamps (never
+/// date-only semantics, unlike Person.dateOfBirth) — parsed via the standard
+/// DateTime.parse of a full ISO 8601 instant.
+class FollowUpSummary {
+  const FollowUpSummary({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.dueDate,
+    required this.status,
+    required this.completedAt,
+    required this.person,
+    required this.assignedTo,
+  });
+
+  final String id;
+  final String title;
+  final String? description;
+  final DateTime? dueDate;
+  final FollowUpStatus status;
+  final DateTime? completedAt;
+  final FollowUpPersonRef person;
+  final FollowUpPersonRef? assignedTo;
+
+  factory FollowUpSummary.fromJson(Map<String, dynamic> json) => FollowUpSummary(
+    id: json['id'] as String,
+    title: json['title'] as String,
+    description: json['description'] as String?,
+    dueDate: json['dueDate'] != null ? DateTime.parse(json['dueDate'] as String) : null,
+    status: FollowUpStatus.fromApiValue(json['status'] as String),
+    completedAt: json['completedAt'] != null ? DateTime.parse(json['completedAt'] as String) : null,
+    person: FollowUpPersonRef.fromJson(json['person'] as Map<String, dynamic>),
+    assignedTo: json['assignedTo'] != null
+        ? FollowUpPersonRef.fromJson(json['assignedTo'] as Map<String, dynamic>)
+        : null,
+  );
+}
+
+/// Mirrors the real, implemented List Follow-Ups response shape exactly:
+/// {followUps, nextCursor}. hasMore mirrors PeopleDirectoryState/PeoplePage's
+/// existing nextCursor-presence convention — the Profile region uses this to
+/// avoid claiming an exhaustive total when more records exist beyond the
+/// bounded first page.
+class FollowUpListResult {
+  const FollowUpListResult({required this.followUps, required this.nextCursor});
+
+  final List<FollowUpSummary> followUps;
+  final String? nextCursor;
+
+  bool get hasMore => nextCursor != null;
+
+  factory FollowUpListResult.fromJson(Map<String, dynamic> json) => FollowUpListResult(
+    followUps: (json['followUps'] as List<dynamic>)
+        .map((followUp) => FollowUpSummary.fromJson(followUp as Map<String, dynamic>))
+        .toList(),
+    nextCursor: json['nextCursor'] as String?,
+  );
+}

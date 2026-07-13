@@ -6,6 +6,11 @@ import 'people_models.dart';
 
 enum ProfileLoadStatus { loading, loaded, error }
 
+/// Independent from [ProfileLoadStatus]: a Follow-up list failure/loading
+/// state must never replace the whole Profile core (Product Task 043 §3) —
+/// only the "Upcoming Follow-ups" region degrades.
+enum FollowUpRegionStatus { loading, loaded, error }
+
 class PersonProfileState {
   const PersonProfileState({
     required this.status,
@@ -15,6 +20,10 @@ class PersonProfileState {
     required this.attendanceSummary,
     required this.errorMessage,
     required this.shouldClose,
+    required this.followUpStatus,
+    required this.followUps,
+    required this.followUpsHasMore,
+    required this.followUpErrorMessage,
   });
 
   factory PersonProfileState.initial() => const PersonProfileState(
@@ -25,6 +34,10 @@ class PersonProfileState {
     attendanceSummary: null,
     errorMessage: null,
     shouldClose: false,
+    followUpStatus: FollowUpRegionStatus.loading,
+    followUps: null,
+    followUpsHasMore: false,
+    followUpErrorMessage: null,
   );
 
   final ProfileLoadStatus status;
@@ -40,6 +53,22 @@ class PersonProfileState {
   /// mirrors AddPersonController.shouldClose exactly.
   final bool shouldClose;
 
+  /// "Upcoming Follow-ups" region state — the real, non-completed
+  /// (PENDING/IN_PROGRESS) Follow-up records from one bounded person-scoped
+  /// page. Never includes COMPLETED records; never an invented UPCOMING
+  /// status. Independent of Profile core [status]: a Follow-up failure never
+  /// erases Detail/Journey/Stages/AttendanceSummary, and a core failure
+  /// simply means this region is never rendered (the whole Profile body is
+  /// replaced by the core error state, unchanged existing behavior).
+  final FollowUpRegionStatus followUpStatus;
+  final List<FollowUpSummary>? followUps;
+
+  /// True when the bounded first page's nextCursor was non-null — the
+  /// visible collection must never be presented as an exhaustive total when
+  /// this is true (no fabricated "{N} scheduled follow-ups" count).
+  final bool followUpsHasMore;
+  final String? followUpErrorMessage;
+
   PersonProfileState copyWith({
     ProfileLoadStatus? status,
     PersonDetail? Function()? detail,
@@ -48,6 +77,10 @@ class PersonProfileState {
     AttendanceSummary? Function()? attendanceSummary,
     String? Function()? errorMessage,
     bool? shouldClose,
+    FollowUpRegionStatus? followUpStatus,
+    List<FollowUpSummary>? Function()? followUps,
+    bool? followUpsHasMore,
+    String? Function()? followUpErrorMessage,
   }) {
     return PersonProfileState(
       status: status ?? this.status,
@@ -57,6 +90,10 @@ class PersonProfileState {
       attendanceSummary: attendanceSummary != null ? attendanceSummary() : this.attendanceSummary,
       errorMessage: errorMessage != null ? errorMessage() : this.errorMessage,
       shouldClose: shouldClose ?? this.shouldClose,
+      followUpStatus: followUpStatus ?? this.followUpStatus,
+      followUps: followUps != null ? followUps() : this.followUps,
+      followUpsHasMore: followUpsHasMore ?? this.followUpsHasMore,
+      followUpErrorMessage: followUpErrorMessage != null ? followUpErrorMessage() : this.followUpErrorMessage,
     );
   }
 }
@@ -92,6 +129,14 @@ class PersonProfileController extends Notifier<PersonProfileState> {
   late final String openingOrganizationId;
   int _generation = 0;
 
+  /// Separate from [_generation] deliberately: a Follow-up-only refresh
+  /// (initial load, region retry, or the post-Create refresh) must never
+  /// re-trigger a full Detail/Journey/Stages/Attendance reload, and a core
+  /// retry must never re-trigger a redundant Follow-up reload. Both counters
+  /// are bumped together only by the organization-switch listener below, so
+  /// org-switch still invalidates every in-flight request region-wide.
+  int _followUpGeneration = 0;
+
   @override
   PersonProfileState build() {
     final organizationContext = ref.read(organizationContextControllerProvider);
@@ -104,6 +149,7 @@ class PersonProfileController extends Notifier<PersonProfileState> {
           next is OrganizationContextActive && next.selectedOrganizationId == openingOrganizationId;
       if (!stillOpeningOrganization) {
         _generation++;
+        _followUpGeneration++;
         state = state.copyWith(shouldClose: true);
       }
     });
@@ -111,11 +157,21 @@ class PersonProfileController extends Notifier<PersonProfileState> {
     final generation = ++_generation;
     Future.microtask(() => _load(generation: generation));
 
+    final followUpGeneration = ++_followUpGeneration;
+    Future.microtask(() => _loadFollowUps(generation: followUpGeneration));
+
     return PersonProfileState.initial();
   }
 
   bool _isCurrent(int generation) {
     if (!ref.mounted || generation != _generation) return false;
+    final organizationContext = ref.read(organizationContextControllerProvider);
+    return organizationContext is OrganizationContextActive &&
+        organizationContext.selectedOrganizationId == openingOrganizationId;
+  }
+
+  bool _isFollowUpCurrent(int generation) {
+    if (!ref.mounted || generation != _followUpGeneration) return false;
     final organizationContext = ref.read(organizationContextControllerProvider);
     return organizationContext is OrganizationContextActive &&
         organizationContext.selectedOrganizationId == openingOrganizationId;
@@ -128,6 +184,49 @@ class PersonProfileController extends Notifier<PersonProfileState> {
     final generation = ++_generation;
     state = state.copyWith(status: ProfileLoadStatus.loading, errorMessage: () => null);
     await _load(generation: generation);
+  }
+
+  /// Region-specific retry/refresh for "Upcoming Follow-ups" only — used both
+  /// for a manual retry after a region error and as the real GET refresh a
+  /// successful Create Follow-up triggers. Never touches Profile core state.
+  Future<void> refreshFollowUps() async {
+    if (openingOrganizationId.isEmpty) return;
+    final generation = ++_followUpGeneration;
+    state = state.copyWith(followUpStatus: FollowUpRegionStatus.loading, followUpErrorMessage: () => null);
+    await _loadFollowUps(generation: generation);
+  }
+
+  Future<void> _loadFollowUps({required int generation}) async {
+    if (openingOrganizationId.isEmpty) return;
+
+    try {
+      final result = await ref
+          .read(peopleApiProvider)
+          .personFollowUps(organizationId: openingOrganizationId, personId: personId);
+
+      if (!_isFollowUpCurrent(generation)) return;
+
+      // Presentation-level exclusion only — never a status query parameter,
+      // never an UPCOMING enum value. Real PENDING/IN_PROGRESS records pass
+      // through unchanged; real COMPLETED records are excluded from this
+      // Profile region only (they still exist and are untouched server-side).
+      final visible = result.followUps.where((followUp) => followUp.status != FollowUpStatus.completed).toList();
+
+      state = state.copyWith(
+        followUpStatus: FollowUpRegionStatus.loaded,
+        followUps: () => visible,
+        followUpsHasMore: result.hasMore,
+        followUpErrorMessage: () => null,
+      );
+    } catch (error) {
+      if (!_isFollowUpCurrent(generation)) return;
+      state = state.copyWith(
+        followUpStatus: FollowUpRegionStatus.error,
+        followUps: () => null,
+        followUpsHasMore: false,
+        followUpErrorMessage: () => error.toString(),
+      );
+    }
   }
 
   Future<void> _load({required int generation}) async {
