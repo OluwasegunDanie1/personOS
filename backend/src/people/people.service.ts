@@ -226,7 +226,10 @@ export class PeopleService {
       dto.lastName !== undefined ||
       dto.email !== undefined ||
       dto.phone !== undefined ||
-      dto.status !== undefined;
+      dto.status !== undefined ||
+      dto.gender !== undefined ||
+      dto.dateOfBirth !== undefined ||
+      dto.address !== undefined;
 
     if (!hasAnyField) {
       throw new ApiException(
@@ -251,6 +254,11 @@ export class PeopleService {
     if (dto.email !== undefined) data.email = dto.email;
     if (dto.phone !== undefined) data.phone = dto.phone;
     if (dto.status !== undefined) data.status = dto.status;
+    if (dto.gender !== undefined) data.gender = dto.gender;
+    if (dto.dateOfBirth !== undefined) {
+      data.dateOfBirth = dto.dateOfBirth ? parseCalendarDateOnlyToUtcDate(dto.dateOfBirth) : null;
+    }
+    if (dto.address !== undefined) data.address = dto.address;
 
     const updated = (await this.prisma.person.update({
       where: { id: personId },

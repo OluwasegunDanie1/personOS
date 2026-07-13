@@ -439,6 +439,160 @@ describe('People route composition', () => {
     });
   });
 
+  describe('PATCH update gender/dateOfBirth/address contract (Product Task 045)', () => {
+    beforeEach(() => {
+      prisma.person.findFirst.mockResolvedValue({ id: PERSON_ID });
+      prisma.person.update.mockResolvedValue({
+        id: PERSON_ID,
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        email: null,
+        phone: null,
+        status: 'ACTIVE',
+        profilePhoto: null,
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      });
+    });
+
+    it('accepts omission (no gender/dateOfBirth/address supplied) alongside another mutable field', async () => {
+      const { status } = await request('PATCH', detailPath, validToken, { firstName: 'Updated' });
+
+      expect(status).toBe(200);
+    });
+
+    it.each(['MALE', 'FEMALE'])('accepts gender %s', async (gender) => {
+      const { status } = await request('PATCH', detailPath, validToken, { gender });
+
+      expect(status).toBe(200);
+    });
+
+    it.each(['Male', 'Female', 'male', 'female', 'OTHER', 'PREFER_NOT_TO_SAY', 'NON_BINARY', ''])(
+      'rejects gender %s',
+      async (gender) => {
+        const { status, json } = await request('PATCH', detailPath, validToken, { gender });
+
+        expect(status).toBe(400);
+        expect(json.success).toBe(false);
+      },
+    );
+
+    it('accepts an explicit null gender and clears it', async () => {
+      const { status } = await request('PATCH', detailPath, validToken, { gender: null });
+
+      expect(status).toBe(200);
+      const args = prisma.person.update.mock.calls[prisma.person.update.mock.calls.length - 1][0];
+      expect(args.data.gender).toBeNull();
+    });
+
+    it('accepts a valid YYYY-MM-DD dateOfBirth', async () => {
+      const { status } = await request('PATCH', detailPath, validToken, { dateOfBirth: '2001-07-14' });
+
+      expect(status).toBe(200);
+    });
+
+    it.each([
+      '01-07-2001',
+      '2001/07/14',
+      '2001-7-14',
+      '2001-07-4',
+      '2001-07-14T00:00:00Z',
+      '2001-07-14T00:00:00+01:00',
+      '2025-02-29',
+      '2025-02-30',
+      '2023-13-01',
+      '2023-00-10',
+      'not-a-date',
+    ])('rejects malformed or impossible dateOfBirth %s', async (dateOfBirth) => {
+      const { status, json } = await request('PATCH', detailPath, validToken, { dateOfBirth });
+
+      expect(status).toBe(400);
+      expect(json.success).toBe(false);
+    });
+
+    it('accepts an explicit null dateOfBirth and clears it', async () => {
+      const { status } = await request('PATCH', detailPath, validToken, { dateOfBirth: null });
+
+      expect(status).toBe(200);
+      const args = prisma.person.update.mock.calls[prisma.person.update.mock.calls.length - 1][0];
+      expect(args.data.dateOfBirth).toBeNull();
+    });
+
+    it('accepts a non-empty address', async () => {
+      const { status } = await request('PATCH', detailPath, validToken, { address: '123 Main St' });
+
+      expect(status).toBe(200);
+    });
+
+    it('accepts an explicit null address and clears it', async () => {
+      const { status } = await request('PATCH', detailPath, validToken, { address: null });
+
+      expect(status).toBe(200);
+      const args = prisma.person.update.mock.calls[prisma.person.update.mock.calls.length - 1][0];
+      expect(args.data.address).toBeNull();
+    });
+
+    it('accepts a whitespace-only address at transport and persists it as null', async () => {
+      const { status } = await request('PATCH', detailPath, validToken, { address: '   ' });
+
+      expect(status).toBe(200);
+      const args = prisma.person.update.mock.calls[prisma.person.update.mock.calls.length - 1][0];
+      expect(args.data.address).toBeNull();
+    });
+
+    it.each(['avatarUrl', 'profilePhoto', 'currentJourneyStageId', 'tags', 'joinedAt'])(
+      'rejects unsupported field %s',
+      async (field) => {
+        const { status, json } = await request('PATCH', detailPath, validToken, { [field]: 'some-value' });
+
+        expect(status).toBe(400);
+        expect(json.success).toBe(false);
+      },
+    );
+
+    it('does not expose gender, dateOfBirth, address, or currentJourneyStage in the PATCH response even when all three are supplied', async () => {
+      const { status, json } = await request('PATCH', detailPath, validToken, {
+        gender: 'FEMALE',
+        dateOfBirth: '2001-07-14',
+        address: '123 Main St',
+      });
+
+      expect(status).toBe(200);
+      const person = json.data!.person as Record<string, unknown>;
+      expect(person).not.toHaveProperty('gender');
+      expect(person).not.toHaveProperty('dateOfBirth');
+      expect(person).not.toHaveProperty('address');
+      expect(person).not.toHaveProperty('currentJourneyStage');
+    });
+
+    it('PATCH followed by GET detail round-trips 2001-01-05 with no timezone-dependent shift', async () => {
+      const { status } = await request('PATCH', detailPath, validToken, { dateOfBirth: '2001-01-05' });
+      expect(status).toBe(200);
+
+      const persistedArgs = prisma.person.update.mock.calls[prisma.person.update.mock.calls.length - 1][0];
+      const persistedDate = persistedArgs.data.dateOfBirth as Date;
+
+      prisma.person.findFirst.mockResolvedValue({
+        id: PERSON_ID,
+        firstName: 'Ada',
+        lastName: 'Lovelace',
+        email: null,
+        phone: null,
+        status: 'ACTIVE',
+        profilePhoto: null,
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        gender: null,
+        dateOfBirth: persistedDate,
+        address: null,
+      });
+      prisma.personTag.findMany.mockResolvedValue([]);
+      prisma.personJourneyHistory.findFirst.mockResolvedValue(null);
+
+      const { json } = await request('GET', detailPath, validToken);
+      const person = json.data!.person as Record<string, unknown>;
+      expect(person.dateOfBirth).toBe('2001-01-05');
+    });
+  });
+
   it('DELETE returns {success:true} on first delete and PERSON_NOT_FOUND on repeat', async () => {
     prisma.person.findFirst.mockResolvedValueOnce({ id: PERSON_ID });
     prisma.person.update.mockResolvedValue({});

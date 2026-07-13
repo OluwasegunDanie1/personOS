@@ -621,14 +621,17 @@ Mutable fields (no others accepted):
   "lastName": "string (optional)",
   "email": "string | null (optional)",
   "phone": "string | null (optional)",
-  "status": "ACTIVE | INACTIVE (optional)"
+  "status": "ACTIVE | INACTIVE (optional)",
+  "gender": "MALE | FEMALE | null (optional)",
+  "dateOfBirth": "string | null (optional)",
+  "address": "string | null (optional)"
 }
 
 Immutable through this endpoint: id, organizationId, avatarUrl, createdAt, updatedAt, deletedAt, tags, journey state/history, attendance, follow-ups, notes.
 
-Partial-update semantics: at least one approved mutable field must be supplied. Normalization and validation match Create Person. An explicit null for email or phone clears it; an empty normalized value also becomes null. firstName and lastName cannot be null or empty after trim. Duplicate email/phone remain allowed.
+Partial-update semantics: at least one approved mutable field must be supplied. Normalization and validation match Create Person. An explicit null for email, phone, gender, dateOfBirth, or address clears it; an empty normalized value also becomes null for email, phone, dateOfBirth, and address. firstName and lastName cannot be null or empty after trim. Duplicate email/phone remain allowed. gender, when non-null, must be exactly MALE or FEMALE (case-sensitive); no other value is accepted. dateOfBirth, when non-null, must be a date-only string in exact YYYY-MM-DD form representing a real calendar date; an ISO 8601 datetime (with a time component, an offset, or a Z suffix) is rejected, as is a calendar-invalid date. address, when non-null, is free text with no structural decomposition.
 
-Success response data matches Create Person's shape. A deleted or cross-tenant Person returns PERSON_NOT_FOUND.
+Success response data matches Create Person's shape (Product Task 045: gender, dateOfBirth, and address become write-only mutable fields on this endpoint — the same write-only boundary Create Person already established — but, like Create Person's own response, Update Person's response never includes them; View Person remains the sole read authority for these three fields). A deleted or cross-tenant Person returns PERSON_NOT_FOUND.
 
 Delete Person
 DELETE /organizations/{organizationId}/people/{personId}

@@ -844,6 +844,73 @@ describe('PeopleService', () => {
       expect(result.person).not.toHaveProperty('address');
       expect(result.person).not.toHaveProperty('currentJourneyStage');
     });
+
+    describe('gender/dateOfBirth/address write authority (Product Task 045)', () => {
+      it('persists a supplied gender', async () => {
+        prisma.person.findFirst.mockResolvedValue({ id: 'person-1' });
+        prisma.person.update.mockResolvedValue(buildPersonRow());
+
+        await service.update(ORG_ID, 'person-1', { gender: 'FEMALE' } as never);
+
+        const args = prisma.person.update.mock.calls[0][0];
+        expect(args.data).toEqual({ gender: 'FEMALE' });
+      });
+
+      it('persists a supplied dateOfBirth using the accepted UTC calendar-date conversion, without shifting the day', async () => {
+        prisma.person.findFirst.mockResolvedValue({ id: 'person-1' });
+        prisma.person.update.mockResolvedValue(buildPersonRow());
+
+        await service.update(ORG_ID, 'person-1', { dateOfBirth: '2001-01-05' } as never);
+
+        const args = prisma.person.update.mock.calls[0][0];
+        const persisted = args.data.dateOfBirth as Date;
+        expect(persisted.getUTCFullYear()).toBe(2001);
+        expect(persisted.getUTCMonth()).toBe(0);
+        expect(persisted.getUTCDate()).toBe(5);
+      });
+
+      it('persists a supplied address', async () => {
+        prisma.person.findFirst.mockResolvedValue({ id: 'person-1' });
+        prisma.person.update.mockResolvedValue(buildPersonRow());
+
+        await service.update(ORG_ID, 'person-1', { address: '221B Baker Street' } as never);
+
+        const args = prisma.person.update.mock.calls[0][0];
+        expect(args.data).toEqual({ address: '221B Baker Street' });
+      });
+
+      it('leaves gender, dateOfBirth, and address absent from the Prisma update data when omitted (unchanged, never overwritten with null)', async () => {
+        prisma.person.findFirst.mockResolvedValue({ id: 'person-1' });
+        prisma.person.update.mockResolvedValue(buildPersonRow());
+
+        await service.update(ORG_ID, 'person-1', { firstName: 'New' } as never);
+
+        const args = prisma.person.update.mock.calls[0][0];
+        expect(args.data).not.toHaveProperty('gender');
+        expect(args.data).not.toHaveProperty('dateOfBirth');
+        expect(args.data).not.toHaveProperty('address');
+      });
+
+      it('null-clears gender, dateOfBirth, and address when explicitly supplied', async () => {
+        prisma.person.findFirst.mockResolvedValue({ id: 'person-1' });
+        prisma.person.update.mockResolvedValue(buildPersonRow());
+
+        await service.update(ORG_ID, 'person-1', { gender: null, dateOfBirth: null, address: null } as never);
+
+        const args = prisma.person.update.mock.calls[0][0];
+        expect(args.data).toEqual({ gender: null, dateOfBirth: null, address: null });
+      });
+
+      it('accepts gender/dateOfBirth/address alone as satisfying the at-least-one-field requirement', async () => {
+        prisma.person.findFirst.mockResolvedValue({ id: 'person-1' });
+        prisma.person.update.mockResolvedValue(buildPersonRow());
+
+        await expect(
+          service.update(ORG_ID, 'person-1', { address: '221B Baker Street' } as never),
+        ).resolves.toBeDefined();
+        expect(prisma.person.findFirst).toHaveBeenCalled();
+      });
+    });
   });
 
   describe('remove', () => {
