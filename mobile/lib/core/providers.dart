@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../features/auth/auth_api.dart';
 import '../features/auth/auth_session_controller.dart';
 import '../features/dashboard/dashboard_api.dart';
+import '../features/events/events_api.dart';
 import '../features/organizations/organizations_api.dart';
 import '../features/people/people_api.dart';
 import 'api/api_client.dart';
@@ -33,3 +34,5 @@ final organizationsApiProvider = Provider<OrganizationsApi>((ref) => Organizatio
 final dashboardApiProvider = Provider<DashboardApi>((ref) => DashboardApi(ref.watch(dioProvider)));
 
 final peopleApiProvider = Provider<PeopleApi>((ref) => PeopleApi(ref.watch(dioProvider)));
+
+final eventsApiProvider = Provider<EventsApi>((ref) => EventsApi(ref.watch(dioProvider)));

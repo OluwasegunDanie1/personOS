@@ -5,6 +5,10 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/auth_session_controller.dart';
 import '../../features/auth/sign_in_screen.dart';
 import '../../features/dashboard/home_screen.dart';
+import '../../features/events/create_event_screen.dart';
+import '../../features/events/edit_event_screen.dart';
+import '../../features/events/event_attendance_screen.dart';
+import '../../features/events/event_detail_screen.dart';
 import '../../features/events/events_screen.dart';
 import '../../features/messages/messages_screen.dart';
 import '../../features/organizations/organization_context_controller.dart';
@@ -121,6 +125,23 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       // back-affordance/no-bottom-nav composition.
       GoRoute(path: '/workspace/members', builder: (context, state) => const OrganizationMembersScreen()),
       GoRoute(path: '/workspace/roles', builder: (context, state) => const RolesPermissionsScreen()),
+      // Pushed above the shell (Product Task 062), mirroring '/people/add'
+      // exactly. Declared before the dynamic '/events/:eventId' route below
+      // (list order determines match precedence for sibling routes), so a
+      // 'create' path segment is never captured as an eventId.
+      GoRoute(path: '/events/create', builder: (context, state) => const CreateEventScreen()),
+      GoRoute(
+        path: '/events/:eventId',
+        builder: (context, state) => EventDetailScreen(eventId: state.pathParameters['eventId']!),
+      ),
+      GoRoute(
+        path: '/events/:eventId/edit',
+        builder: (context, state) => EditEventScreen(eventId: state.pathParameters['eventId']!),
+      ),
+      GoRoute(
+        path: '/events/:eventId/attendance',
+        builder: (context, state) => EventAttendanceScreen(eventId: state.pathParameters['eventId']!),
+      ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) => PrimaryNavigationShell(navigationShell: navigationShell),
         branches: [
