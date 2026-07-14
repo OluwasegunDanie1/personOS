@@ -25,6 +25,49 @@ export interface OrganizationDetail {
   name: string;
 }
 
+export interface OrganizationMemberSummary {
+  membershipId: string;
+  user: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  role: {
+    id: string;
+    name: string;
+  };
+}
+
+export interface OrganizationMemberListResult {
+  members: OrganizationMemberSummary[];
+}
+
+export interface RolePermissionSummary {
+  id: string;
+  name: string;
+}
+
+export interface RoleSummary {
+  id: string;
+  name: string;
+  description: string | null;
+  permissions: RolePermissionSummary[];
+}
+
+export interface RoleListResult {
+  roles: RoleSummary[];
+}
+
+export interface PermissionSummary {
+  id: string;
+  name: string;
+}
+
+export interface PermissionListResult {
+  permissions: PermissionSummary[];
+}
+
 /**
  * Extends the existing organization-fixture slugify() convention
  * (src/dev/organization-fixture.logic.ts) with an appended uniqueness
@@ -133,5 +176,85 @@ export class OrganizationsService {
     });
 
     return { organization };
+  }
+
+  /**
+   * Read-only (Product Task 050). Existing OrganizationMembership rows
+   * already exist for every organization (Create Organization always
+   * creates one for the creator), so this is a narrow read boundary over
+   * already-authoritative data — no new domain concept. Scoped exclusively
+   * by the guard-derived organizationId; the caller is never trusted to
+   * supply organization scope any other way.
+   */
+  async listMembers(organizationId: string): Promise<OrganizationMemberListResult> {
+    const memberships = await this.prisma.organizationMembership.findMany({
+      where: { organizationId },
+      select: {
+        id: true,
+        user: { select: { id: true, firstName: true, lastName: true, email: true } },
+        role: { select: { id: true, name: true } },
+      },
+      orderBy: [{ user: { firstName: 'asc' } }, { user: { lastName: 'asc' } }, { id: 'asc' }],
+    });
+
+    return {
+      members: memberships.map((membership) => ({
+        membershipId: membership.id,
+        user: membership.user,
+        role: membership.role,
+      })),
+    };
+  }
+
+  /**
+   * Read-only (Product Task 050). Each role's currently-assigned
+   * permissions are embedded directly (via the existing RolePermission
+   * join) so the real role-permission relationship is readable without a
+   * separate per-role endpoint. Role.description is an existing, already-
+   * approved schema field; no new field is invented.
+   */
+  async listRoles(organizationId: string): Promise<RoleListResult> {
+    const roles = await this.prisma.role.findMany({
+      where: { organizationId },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        rolePermissions: {
+          select: { permission: { select: { id: true, name: true } } },
+          orderBy: { permission: { name: 'asc' } },
+        },
+      },
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
+    });
+
+    return {
+      roles: roles.map((role) => ({
+        id: role.id,
+        name: role.name,
+        description: role.description,
+        permissions: role.rolePermissions.map((rolePermission) => rolePermission.permission),
+      })),
+    };
+  }
+
+  /**
+   * Read-only (Product Task 050). Permission is a global (non-organization-
+   * scoped) table; this returns the distinct set of Permission rows
+   * currently assigned, via RolePermission, to any Role belonging to the
+   * validated organization — never the full global catalogue, and never a
+   * cross-tenant permission. Today this returns an empty list for every
+   * organization (no seeding path creates Permission/RolePermission rows
+   * anywhere in this codebase); the contract is real and truthful
+   * regardless of current row count.
+   */
+  async listPermissions(organizationId: string): Promise<PermissionListResult> {
+    const permissions = await this.prisma.permission.findMany({
+      where: { rolePermissions: { some: { role: { organizationId } } } },
+      select: { id: true, name: true },
+      orderBy: [{ name: 'asc' }, { id: 'asc' }],
+    });
+
+    return { permissions };
   }
 }

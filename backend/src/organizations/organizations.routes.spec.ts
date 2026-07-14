@@ -15,7 +15,13 @@ import {
 
 interface TestResponseBody {
   success: boolean;
-  data?: { organizations?: Array<Record<string, unknown>>; organization?: Record<string, unknown> };
+  data?: {
+    organizations?: Array<Record<string, unknown>>;
+    organization?: Record<string, unknown>;
+    members?: Array<Record<string, unknown>>;
+    roles?: Array<Record<string, unknown>>;
+    permissions?: Array<Record<string, unknown>>;
+  };
   error?: { code: string; message: string };
 }
 
@@ -32,7 +38,8 @@ describe('Organizations route composition', () => {
     user: { findUnique: jest.Mock };
     organizationMembership: { findMany: jest.Mock; findUnique: jest.Mock; create: jest.Mock };
     organization: { create: jest.Mock; findFirst: jest.Mock; update: jest.Mock };
-    role: { create: jest.Mock };
+    role: { create: jest.Mock; findMany: jest.Mock };
+    permission: { findMany: jest.Mock };
     $transaction: jest.Mock;
   };
   let validToken: string;
@@ -45,7 +52,8 @@ describe('Organizations route composition', () => {
       user: { findUnique: jest.fn() },
       organizationMembership: { findMany: jest.fn(), findUnique: jest.fn(), create: jest.fn() },
       organization: { create: jest.fn(), findFirst: jest.fn(), update: jest.fn() },
-      role: { create: jest.fn() },
+      role: { create: jest.fn(), findMany: jest.fn() },
+      permission: { findMany: jest.fn() },
       $transaction: jest.fn((ops: Promise<unknown>[]) => Promise.all(ops)),
     };
 
@@ -331,6 +339,212 @@ describe('Organizations route composition', () => {
       expect(status).toBe(200);
       expect(json.data).toEqual({ organization: { id: ORG_ID, name: 'Updated Name' } });
     });
+  });
+
+  describe('GET /organizations/:organizationId/members (Product Task 050)', () => {
+    beforeEach(() => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'user-1', status: 'ACTIVE', deletedAt: null });
+      prisma.organizationMembership.findUnique.mockResolvedValue({
+        id: 'membership-1',
+        organizationId: ORG_ID,
+        roleId: 'role-1',
+      });
+    });
+
+    it('rejects a missing access token with AUTHENTICATION_REQUIRED', async () => {
+      const { status, json } = await request('GET', `/api/v1/organizations/${ORG_ID}/members`);
+
+      expect(status).toBe(401);
+      expect(json.error?.code).toBe('AUTHENTICATION_REQUIRED');
+    });
+
+    it('rejects a non-member with ORGANIZATION_ACCESS_DENIED', async () => {
+      prisma.organizationMembership.findUnique.mockResolvedValue(null);
+
+      const { status, json } = await request('GET', `/api/v1/organizations/${ORG_ID}/members`, validToken);
+
+      expect(status).toBe(403);
+      expect(json.error?.code).toBe('ORGANIZATION_ACCESS_DENIED');
+    });
+
+    it('returns exactly {membershipId, user, role} per member for an active member', async () => {
+      prisma.organizationMembership.findMany.mockResolvedValue([
+        {
+          id: 'membership-1',
+          user: { id: 'user-1', firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com' },
+          role: { id: 'role-1', name: 'Owner' },
+        },
+      ]);
+
+      const { status, json } = await request('GET', `/api/v1/organizations/${ORG_ID}/members`, validToken);
+
+      expect(status).toBe(200);
+      expect(json.data?.members).toEqual([
+        {
+          membershipId: 'membership-1',
+          user: { id: 'user-1', firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com' },
+          role: { id: 'role-1', name: 'Owner' },
+        },
+      ]);
+    });
+
+    it('scopes the query to the guard-derived organizationId, not a raw path value', async () => {
+      prisma.organizationMembership.findMany.mockResolvedValue([]);
+
+      await request('GET', `/api/v1/organizations/${ORG_ID}/members`, validToken);
+
+      const findManyArgs = prisma.organizationMembership.findMany.mock.calls[0][0];
+      expect(findManyArgs.where).toEqual({ organizationId: ORG_ID });
+    });
+
+    it('returns members: [] with HTTP 200 when the organization has no memberships', async () => {
+      prisma.organizationMembership.findMany.mockResolvedValue([]);
+
+      const { status, json } = await request('GET', `/api/v1/organizations/${ORG_ID}/members`, validToken);
+
+      expect(status).toBe(200);
+      expect(json.data).toEqual({ members: [] });
+    });
+  });
+
+  describe('GET /organizations/:organizationId/roles (Product Task 050)', () => {
+    beforeEach(() => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'user-1', status: 'ACTIVE', deletedAt: null });
+      prisma.organizationMembership.findUnique.mockResolvedValue({
+        id: 'membership-1',
+        organizationId: ORG_ID,
+        roleId: 'role-1',
+      });
+    });
+
+    it('rejects a missing access token with AUTHENTICATION_REQUIRED', async () => {
+      const { status, json } = await request('GET', `/api/v1/organizations/${ORG_ID}/roles`);
+
+      expect(status).toBe(401);
+      expect(json.error?.code).toBe('AUTHENTICATION_REQUIRED');
+    });
+
+    it('rejects a non-member with ORGANIZATION_ACCESS_DENIED', async () => {
+      prisma.organizationMembership.findUnique.mockResolvedValue(null);
+
+      const { status, json } = await request('GET', `/api/v1/organizations/${ORG_ID}/roles`, validToken);
+
+      expect(status).toBe(403);
+      expect(json.error?.code).toBe('ORGANIZATION_ACCESS_DENIED');
+    });
+
+    it('returns exactly {id, name, description, permissions} per role, with real embedded permissions', async () => {
+      prisma.role.findMany.mockResolvedValue([
+        {
+          id: 'role-1',
+          name: 'Owner',
+          description: 'Full access',
+          rolePermissions: [{ permission: { id: 'perm-1', name: 'people.view' } }],
+        },
+      ]);
+
+      const { status, json } = await request('GET', `/api/v1/organizations/${ORG_ID}/roles`, validToken);
+
+      expect(status).toBe(200);
+      expect(json.data?.roles).toEqual([
+        { id: 'role-1', name: 'Owner', description: 'Full access', permissions: [{ id: 'perm-1', name: 'people.view' }] },
+      ]);
+    });
+
+    it('scopes the query to the guard-derived organizationId, not a raw path value', async () => {
+      prisma.role.findMany.mockResolvedValue([]);
+
+      await request('GET', `/api/v1/organizations/${ORG_ID}/roles`, validToken);
+
+      const findManyArgs = prisma.role.findMany.mock.calls[0][0];
+      expect(findManyArgs.where).toEqual({ organizationId: ORG_ID });
+    });
+
+    it('returns roles: [] with HTTP 200 when the organization has no roles', async () => {
+      prisma.role.findMany.mockResolvedValue([]);
+
+      const { status, json } = await request('GET', `/api/v1/organizations/${ORG_ID}/roles`, validToken);
+
+      expect(status).toBe(200);
+      expect(json.data).toEqual({ roles: [] });
+    });
+  });
+
+  describe('GET /organizations/:organizationId/permissions (Product Task 050)', () => {
+    beforeEach(() => {
+      prisma.user.findUnique.mockResolvedValue({ id: 'user-1', status: 'ACTIVE', deletedAt: null });
+      prisma.organizationMembership.findUnique.mockResolvedValue({
+        id: 'membership-1',
+        organizationId: ORG_ID,
+        roleId: 'role-1',
+      });
+    });
+
+    it('rejects a missing access token with AUTHENTICATION_REQUIRED', async () => {
+      const { status, json } = await request('GET', `/api/v1/organizations/${ORG_ID}/permissions`);
+
+      expect(status).toBe(401);
+      expect(json.error?.code).toBe('AUTHENTICATION_REQUIRED');
+    });
+
+    it('rejects a non-member with ORGANIZATION_ACCESS_DENIED', async () => {
+      prisma.organizationMembership.findUnique.mockResolvedValue(null);
+
+      const { status, json } = await request('GET', `/api/v1/organizations/${ORG_ID}/permissions`, validToken);
+
+      expect(status).toBe(403);
+      expect(json.error?.code).toBe('ORGANIZATION_ACCESS_DENIED');
+    });
+
+    it('returns exactly {id, name} per permission', async () => {
+      prisma.permission.findMany.mockResolvedValue([{ id: 'perm-1', name: 'people.view' }]);
+
+      const { status, json } = await request('GET', `/api/v1/organizations/${ORG_ID}/permissions`, validToken);
+
+      expect(status).toBe(200);
+      expect(json.data?.permissions).toEqual([{ id: 'perm-1', name: 'people.view' }]);
+    });
+
+    it('scopes the query to permissions assigned to a role in the guard-derived organization only', async () => {
+      prisma.permission.findMany.mockResolvedValue([]);
+
+      await request('GET', `/api/v1/organizations/${ORG_ID}/permissions`, validToken);
+
+      const findManyArgs = prisma.permission.findMany.mock.calls[0][0];
+      expect(findManyArgs.where).toEqual({ rolePermissions: { some: { role: { organizationId: ORG_ID } } } });
+    });
+
+    it('returns permissions: [] with HTTP 200 when no permissions are assigned to this organization (real current state)', async () => {
+      prisma.permission.findMany.mockResolvedValue([]);
+
+      const { status, json } = await request('GET', `/api/v1/organizations/${ORG_ID}/permissions`, validToken);
+
+      expect(status).toBe(200);
+      expect(json.data).toEqual({ permissions: [] });
+    });
+  });
+
+  it('there are no mutation routes for members, roles, or permissions', async () => {
+    prisma.user.findUnique.mockResolvedValue({ id: 'user-1', status: 'ACTIVE', deletedAt: null });
+    prisma.organizationMembership.findUnique.mockResolvedValue({
+      id: 'membership-1',
+      organizationId: ORG_ID,
+      roleId: 'role-1',
+    });
+
+    const mutationRoutes: Array<[string, string]> = [
+      ['POST', `/api/v1/organizations/${ORG_ID}/roles`],
+      ['PATCH', `/api/v1/organizations/${ORG_ID}/roles/some-role-id`],
+      ['DELETE', `/api/v1/organizations/${ORG_ID}/roles/some-role-id`],
+      ['PATCH', `/api/v1/organizations/${ORG_ID}/members/some-user-id/role`],
+      ['DELETE', `/api/v1/organizations/${ORG_ID}/members/some-user-id`],
+      ['PATCH', `/api/v1/organizations/${ORG_ID}/roles/some-role-id/permissions`],
+    ];
+
+    for (const [method, path] of mutationRoutes) {
+      const { status } = await request(method, path, validToken, method === 'POST' || method === 'PATCH' ? {} : undefined);
+      expect(status).toBe(404);
+    }
   });
 
   it('there is no DELETE Organization route', async () => {

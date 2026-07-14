@@ -4,7 +4,8 @@ function createMockPrisma() {
   return {
     organizationMembership: { findMany: jest.fn(), create: jest.fn() },
     organization: { create: jest.fn(), findFirst: jest.fn(), update: jest.fn() },
-    role: { create: jest.fn() },
+    role: { create: jest.fn(), findMany: jest.fn() },
+    permission: { findMany: jest.fn() },
     $transaction: jest.fn(),
   };
 }
@@ -157,7 +158,7 @@ describe('OrganizationsService', () => {
       });
     });
 
-    it('creates zero Permission/RolePermission rows (mock exposes no such model call)', async () => {
+    it('creates zero Permission/RolePermission rows', async () => {
       prisma.organization.create.mockResolvedValue({ id: 'org-1', name: 'Acme' });
       prisma.role.create.mockResolvedValue({ id: 'role-1' });
       (prisma as unknown as { organizationMembership: { create: jest.Mock } }).organizationMembership.create = jest
@@ -166,8 +167,7 @@ describe('OrganizationsService', () => {
 
       await service.create('user-1', { name: 'Acme' } as never);
 
-      expect(Object.keys(prisma)).not.toContain('permission');
-      expect(Object.keys(prisma)).not.toContain('rolePermission');
+      expect(prisma.permission.findMany).not.toHaveBeenCalled();
     });
 
     it('performs the three creates as a single atomic $transaction call', async () => {
@@ -253,6 +253,191 @@ describe('OrganizationsService', () => {
       const result = await service.update('org-1', { name: 'Updated' } as never);
 
       expect(result).toEqual({ organization: { id: 'org-1', name: 'Updated' } });
+    });
+  });
+
+  describe('listMembers (Product Task 050)', () => {
+    it('scopes the membership query by the given organizationId', async () => {
+      prisma.organizationMembership.findMany.mockResolvedValue([]);
+
+      await service.listMembers('org-1');
+
+      expect(prisma.organizationMembership.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { organizationId: 'org-1' } }),
+      );
+    });
+
+    it('orders deterministically by user firstName, lastName, then membership id ascending', async () => {
+      prisma.organizationMembership.findMany.mockResolvedValue([]);
+
+      await service.listMembers('org-1');
+
+      expect(prisma.organizationMembership.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: [{ user: { firstName: 'asc' } }, { user: { lastName: 'asc' } }, { id: 'asc' }],
+        }),
+      );
+    });
+
+    it('maps membership rows to {membershipId, user, role} exactly', async () => {
+      prisma.organizationMembership.findMany.mockResolvedValue([
+        {
+          id: 'membership-1',
+          user: { id: 'user-1', firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com' },
+          role: { id: 'role-1', name: 'Owner' },
+        },
+      ]);
+
+      const result = await service.listMembers('org-1');
+
+      expect(result).toEqual({
+        members: [
+          {
+            membershipId: 'membership-1',
+            user: { id: 'user-1', firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com' },
+            role: { id: 'role-1', name: 'Owner' },
+          },
+        ],
+      });
+    });
+
+    it('never invents status, invite state, permissions summary, phone, avatar, or activity fields', async () => {
+      prisma.organizationMembership.findMany.mockResolvedValue([
+        {
+          id: 'membership-1',
+          user: { id: 'user-1', firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com' },
+          role: { id: 'role-1', name: 'Owner' },
+        },
+      ]);
+
+      const result = await service.listMembers('org-1');
+      const member = result.members[0] as unknown as Record<string, unknown>;
+
+      expect(member).not.toHaveProperty('status');
+      expect(member).not.toHaveProperty('inviteState');
+      expect(member).not.toHaveProperty('permissions');
+      expect(member.user).not.toHaveProperty('phone');
+      expect(member.user).not.toHaveProperty('avatar');
+      expect(member).not.toHaveProperty('lastActive');
+    });
+
+    it('returns an empty members array when the organization has no memberships', async () => {
+      prisma.organizationMembership.findMany.mockResolvedValue([]);
+
+      const result = await service.listMembers('org-1');
+
+      expect(result).toEqual({ members: [] });
+    });
+  });
+
+  describe('listRoles (Product Task 050)', () => {
+    it('scopes the role query by the given organizationId', async () => {
+      prisma.role.findMany.mockResolvedValue([]);
+
+      await service.listRoles('org-1');
+
+      expect(prisma.role.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { organizationId: 'org-1' } }));
+    });
+
+    it('orders deterministically by name then id ascending', async () => {
+      prisma.role.findMany.mockResolvedValue([]);
+
+      await service.listRoles('org-1');
+
+      expect(prisma.role.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ orderBy: [{ name: 'asc' }, { id: 'asc' }] }),
+      );
+    });
+
+    it('maps each role to {id, name, description, permissions} using the real RolePermission join', async () => {
+      prisma.role.findMany.mockResolvedValue([
+        {
+          id: 'role-1',
+          name: 'Owner',
+          description: 'Full access',
+          rolePermissions: [{ permission: { id: 'perm-1', name: 'people.view' } }],
+        },
+      ]);
+
+      const result = await service.listRoles('org-1');
+
+      expect(result).toEqual({
+        roles: [
+          {
+            id: 'role-1',
+            name: 'Owner',
+            description: 'Full access',
+            permissions: [{ id: 'perm-1', name: 'people.view' }],
+          },
+        ],
+      });
+    });
+
+    it('returns an empty permissions array for a role with no assigned permissions', async () => {
+      prisma.role.findMany.mockResolvedValue([
+        { id: 'role-1', name: 'Owner', description: null, rolePermissions: [] },
+      ]);
+
+      const result = await service.listRoles('org-1');
+
+      expect(result.roles[0].permissions).toEqual([]);
+    });
+
+    it('does not create, update, or delete any role', async () => {
+      prisma.role.findMany.mockResolvedValue([]);
+
+      await service.listRoles('org-1');
+
+      expect(prisma.role.create).not.toHaveBeenCalled();
+    });
+
+    it('returns an empty roles array when the organization has no roles', async () => {
+      prisma.role.findMany.mockResolvedValue([]);
+
+      const result = await service.listRoles('org-1');
+
+      expect(result).toEqual({ roles: [] });
+    });
+  });
+
+  describe('listPermissions (Product Task 050)', () => {
+    it('scopes the permission query to permissions assigned to a role in the given organization', async () => {
+      prisma.permission.findMany.mockResolvedValue([]);
+
+      await service.listPermissions('org-1');
+
+      expect(prisma.permission.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { rolePermissions: { some: { role: { organizationId: 'org-1' } } } } }),
+      );
+    });
+
+    it('orders deterministically by name then id ascending', async () => {
+      prisma.permission.findMany.mockResolvedValue([]);
+
+      await service.listPermissions('org-1');
+
+      expect(prisma.permission.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ orderBy: [{ name: 'asc' }, { id: 'asc' }] }),
+      );
+    });
+
+    it('returns exactly {id, name} per permission, never an invented group/category/description', async () => {
+      prisma.permission.findMany.mockResolvedValue([{ id: 'perm-1', name: 'people.view' }]);
+
+      const result = await service.listPermissions('org-1');
+
+      expect(result).toEqual({ permissions: [{ id: 'perm-1', name: 'people.view' }] });
+      expect(result.permissions[0]).not.toHaveProperty('category');
+      expect(result.permissions[0]).not.toHaveProperty('group');
+      expect(result.permissions[0]).not.toHaveProperty('description');
+    });
+
+    it('returns an empty permissions array when no Permission rows are assigned to this organization (real current state)', async () => {
+      prisma.permission.findMany.mockResolvedValue([]);
+
+      const result = await service.listPermissions('org-1');
+
+      expect(result).toEqual({ permissions: [] });
     });
   });
 });

@@ -452,8 +452,35 @@ Organization Members
 
 These endpoints operate on a user's Organization Membership within the given organization. A user is a global identity and may hold a separate membership, with its own role, in each organization they belong to.
 
-List Members
+List Members (Product Task 050)
 GET /organizations/{organizationId}/members
+
+Requires the global access-token guard, OrganizationMembershipGuard, and a validated request.organization context, identically to every other organization-scoped endpoint. Accepts no query parameters; there is no pagination, search, or filter in v1. Scoped exclusively by the guard-derived organizationId — the raw path parameter is never trusted directly.
+
+Success response data:
+
+{
+  "members": [
+    {
+      "membershipId": "string",
+      "user": {
+        "id": "string",
+        "firstName": "string",
+        "lastName": "string",
+        "email": "string"
+      },
+      "role": {
+        "id": "string",
+        "name": "string"
+      }
+    }
+  ]
+}
+
+Ordering: user firstName ascending, then lastName ascending, then membershipId ascending (deterministic tie-break). Empty state (HTTP 200, standard success envelope): { "members": [] }. This is read-only: member status, invite state, a permissions summary, phone, avatar, and last-activity are not part of this contract and are not returned.
+
+View Member, Update Member Role, and Remove Member (below) remain bare, unresolved paths — named only as placeholders. No request/response contract, role-change semantics, or removal behavior is approved for them, and none is implemented.
+
 View Member
 GET /organizations/{organizationId}/members/{userId}
 Update Member Role
@@ -1260,8 +1287,28 @@ PATCH /notifications/read-all
 Clear Read Notifications
 DELETE /notifications/read
 Roles
-List Roles
+List Roles (Product Task 050)
 GET /organizations/{organizationId}/roles
+
+Requires the global access-token guard, OrganizationMembershipGuard, and a validated request.organization context. Accepts no query parameters; there is no pagination in v1. Scoped exclusively by the guard-derived organizationId.
+
+Success response data:
+
+{
+  "roles": [
+    {
+      "id": "string",
+      "name": "string",
+      "description": "string | null",
+      "permissions": [
+        { "id": "string", "name": "string" }
+      ]
+    }
+  ]
+}
+
+permissions embeds each role's currently-assigned Permission rows via the existing RolePermission join — this is how the real role-permission relationship is exposed; there is no separate "View Role Permissions" read endpoint. Ordering: role name ascending then id ascending; each role's own permissions are ordered by permission name ascending. Empty state (HTTP 200): { "roles": [] }. A role with no assigned permissions returns permissions: []. This is read-only: Create Role, Update Role, and Delete Role (below) remain bare, unresolved paths — no mutation contract is approved or implemented.
+
 Create Role
 POST /organizations/{organizationId}/roles
 View Role
@@ -1274,38 +1321,21 @@ DELETE /organizations/{organizationId}/roles/{roleId}
 Protected system roles may not be deleted.
 
 Permissions
-List Permissions
-GET /permissions
+List Permissions (Product Task 050)
+GET /organizations/{organizationId}/permissions
 
-Returns supported platform permissions.
+Requires the global access-token guard, OrganizationMembershipGuard, and a validated request.organization context. Permission is a global (non-organization-scoped) table, so this endpoint does not return the full platform catalogue; it returns exactly the distinct Permission rows currently assigned, via RolePermission, to any Role belonging to the validated organization. Accepts no query parameters.
 
-Examples:
+Success response data:
 
-people.view
-people.create
-people.update
-people.delete
+{
+  "permissions": [
+    { "id": "string", "name": "string" }
+  ]
+}
 
-events.view
-events.create
-events.update
-events.delete
+Ordering: name ascending then id ascending. Empty state (HTTP 200): { "permissions": [] } — this is the real, expected response for every organization today, since no approved seeding path creates Permission or RolePermission rows anywhere in this codebase; the contract is truthful regardless of current row count. No permission group, category, description, or enforcement-behavior field is part of this contract; none is approved. This is read-only: Update Role Permissions (below) remains a bare, unresolved path — no write contract is approved or implemented. There is no unscoped GET /permissions platform-catalogue endpoint in v1; List Permissions is organization-scoped only.
 
-attendance.view
-attendance.record
-
-communication.view
-communication.send
-
-reports.view
-reports.export
-
-organization.update
-roles.manage
-billing.manage
-settings.manage
-View Role Permissions
-GET /organizations/{organizationId}/roles/{roleId}/permissions
 Update Role Permissions
 PATCH /organizations/{organizationId}/roles/{roleId}/permissions
 Reports

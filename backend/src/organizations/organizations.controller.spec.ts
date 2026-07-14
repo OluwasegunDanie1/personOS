@@ -95,4 +95,61 @@ describe('OrganizationsController', () => {
       expect(service.update).toHaveBeenCalledWith(ORG_ID, dto);
     });
   });
+
+  describe('listMembers (Product Task 050)', () => {
+    it('applies OrganizationMembershipGuard at the method level', () => {
+      const controller = new OrganizationsController({} as never);
+      const guards = Reflect.getMetadata(GUARDS_METADATA, controller.listMembers) as unknown[];
+
+      expect(guards).toEqual([OrganizationMembershipGuard]);
+    });
+
+    it('uses request.organization.organizationId, never the raw path param', async () => {
+      const service = { listMembers: jest.fn().mockResolvedValue({ members: [] }) };
+      const controller = new OrganizationsController(service as unknown as OrganizationsService);
+      const request = buildRequest({ params: { organizationId: 'attacker-supplied-id' } });
+
+      await controller.listMembers(request);
+
+      expect(service.listMembers).toHaveBeenCalledWith(ORG_ID);
+    });
+  });
+
+  describe('listRoles (Product Task 050)', () => {
+    it('applies OrganizationMembershipGuard at the method level', () => {
+      const controller = new OrganizationsController({} as never);
+      const guards = Reflect.getMetadata(GUARDS_METADATA, controller.listRoles) as unknown[];
+
+      expect(guards).toEqual([OrganizationMembershipGuard]);
+    });
+
+    it('uses request.organization.organizationId, never the raw path param', async () => {
+      const service = { listRoles: jest.fn().mockResolvedValue({ roles: [] }) };
+      const controller = new OrganizationsController(service as unknown as OrganizationsService);
+      const request = buildRequest({ params: { organizationId: 'attacker-supplied-id' } });
+
+      await controller.listRoles(request);
+
+      expect(service.listRoles).toHaveBeenCalledWith(ORG_ID);
+    });
+  });
+
+  describe('listPermissions (Product Task 050)', () => {
+    it('applies OrganizationMembershipGuard at the method level', () => {
+      const controller = new OrganizationsController({} as never);
+      const guards = Reflect.getMetadata(GUARDS_METADATA, controller.listPermissions) as unknown[];
+
+      expect(guards).toEqual([OrganizationMembershipGuard]);
+    });
+
+    it('uses request.organization.organizationId, never the raw path param', async () => {
+      const service = { listPermissions: jest.fn().mockResolvedValue({ permissions: [] }) };
+      const controller = new OrganizationsController(service as unknown as OrganizationsService);
+      const request = buildRequest({ params: { organizationId: 'attacker-supplied-id' } });
+
+      await controller.listPermissions(request);
+
+      expect(service.listPermissions).toHaveBeenCalledWith(ORG_ID);
+    });
+  });
 });

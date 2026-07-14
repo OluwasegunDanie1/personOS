@@ -3,7 +3,14 @@ import { OrganizationMembershipGuard } from '../common/guards/organization-membe
 import { AuthenticatedRequest } from '../common/http/request-context';
 import { CreateOrganizationDto } from './dto/create-organization.dto';
 import { UpdateOrganizationDto } from './dto/update-organization.dto';
-import { OrganizationDetail, OrganizationListResult, OrganizationsService } from './organizations.service';
+import {
+  OrganizationDetail,
+  OrganizationListResult,
+  OrganizationMemberListResult,
+  OrganizationsService,
+  PermissionListResult,
+  RoleListResult,
+} from './organizations.service';
 
 @Controller('organizations')
 export class OrganizationsController {
@@ -40,5 +47,23 @@ export class OrganizationsController {
     @Body() dto: UpdateOrganizationDto,
   ): Promise<{ organization: OrganizationDetail }> {
     return this.organizationsService.update(request.organization!.organizationId, dto);
+  }
+
+  @Get(':organizationId/members')
+  @UseGuards(OrganizationMembershipGuard)
+  listMembers(@Req() request: AuthenticatedRequest): Promise<OrganizationMemberListResult> {
+    return this.organizationsService.listMembers(request.organization!.organizationId);
+  }
+
+  @Get(':organizationId/roles')
+  @UseGuards(OrganizationMembershipGuard)
+  listRoles(@Req() request: AuthenticatedRequest): Promise<RoleListResult> {
+    return this.organizationsService.listRoles(request.organization!.organizationId);
+  }
+
+  @Get(':organizationId/permissions')
+  @UseGuards(OrganizationMembershipGuard)
+  listPermissions(@Req() request: AuthenticatedRequest): Promise<PermissionListResult> {
+    return this.organizationsService.listPermissions(request.organization!.organizationId);
   }
 }
