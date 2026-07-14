@@ -14,10 +14,12 @@ import '../organizations/organization_models.dart';
 /// Settings, Help Center, and About — none of those have an approved
 /// backend capability, so rendering them (even disabled) would visually
 /// promise functionality this build does not have. Organization Members and
-/// Roles & Permissions are now real, interactive entries (Product Task 052,
-/// integrating Product Task 050's read-only API authority); everything else
-/// remains identity display, organization switching (client-side context
-/// per 16_Security.md), and logout.
+/// Roles & Permissions are real, interactive entries (Product Task 052,
+/// integrating Product Task 050's read-only API authority); My Profile
+/// (read-only) and Organization (name edit only) are also now real entries
+/// (Product Task 080, per Product Task 079's authority audit); everything
+/// else remains identity display, organization switching (client-side
+/// context per 16_Security.md), and logout.
 class WorkspaceScreen extends ConsumerWidget {
   const WorkspaceScreen({super.key});
 
@@ -43,6 +45,8 @@ class WorkspaceScreen extends ConsumerWidget {
             _OrganizationSection(context: organizationContext, ref: ref),
           const SizedBox(height: 24),
           const _ManageOrganizationSection(),
+          const SizedBox(height: 24),
+          const _AccountSection(),
           const SizedBox(height: 32),
           SizedBox(
             width: double.infinity,
@@ -204,7 +208,49 @@ class _ManageOrganizationSection extends StatelessWidget {
                 subtitle: 'View roles and their real assigned permissions',
                 onTap: () => context.push('/workspace/roles'),
               ),
+              const Divider(height: 1),
+              _ManageOrganizationTile(
+                icon: Icons.apartment_outlined,
+                title: 'Organization',
+                subtitle: 'Edit the organization name',
+                onTap: () => context.push('/workspace/organization'),
+              ),
             ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The frozen "More" menu's Account section (design/ui-reference/12.png)
+/// narrowed to the one real entry: a read-only My Profile view (Product
+/// Task 080). Security and Appearance are omitted — neither has approved
+/// backend authority (Product Task 071/079).
+class _AccountSection extends StatelessWidget {
+  const _AccountSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Account',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textSecondary),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.surfaceCard,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.borderSubtle),
+          ),
+          child: _ManageOrganizationTile(
+            icon: Icons.person_outline,
+            title: 'My Profile',
+            subtitle: 'View your profile',
+            onTap: () => context.push('/workspace/profile'),
           ),
         ),
       ],

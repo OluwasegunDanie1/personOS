@@ -18,6 +18,7 @@ import '../../features/messages/messages_screen.dart';
 import '../../features/notifications/notifications_screen.dart';
 import '../../features/onboarding/onboarding_screen.dart';
 import '../../features/onboarding/welcome_screen.dart';
+import '../../features/organizations/edit_organization_screen.dart';
 import '../../features/organizations/organization_context_controller.dart';
 import '../../features/organizations/organization_ready_screen.dart';
 import '../../features/organizations/organization_setup_screen.dart';
@@ -26,6 +27,7 @@ import '../../features/people/create_follow_up_screen.dart';
 import '../../features/people/edit_person_screen.dart';
 import '../../features/people/people_screen.dart';
 import '../../features/people/person_profile_screen.dart';
+import '../../features/workspace/my_profile_screen.dart';
 import '../../features/workspace/organization_members_screen.dart';
 import '../../features/workspace/roles_permissions_screen.dart';
 import '../../features/workspace/workspace_screen.dart';
@@ -178,6 +180,11 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       // back-affordance/no-bottom-nav composition.
       GoRoute(path: '/workspace/members', builder: (context, state) => const OrganizationMembersScreen()),
       GoRoute(path: '/workspace/roles', builder: (context, state) => const RolesPermissionsScreen()),
+      // Also pushed above the shell (Product Task 080) — real, authority-
+      // backed additions identified by Product Task 079's audit: a read-only
+      // My Profile view and an Organization Name edit surface.
+      GoRoute(path: '/workspace/profile', builder: (context, state) => const MyProfileScreen()),
+      GoRoute(path: '/workspace/organization', builder: (context, state) => const EditOrganizationScreen()),
       // Pushed above the shell (Product Task 062), mirroring '/people/add'
       // exactly. Declared before the dynamic '/events/:eventId' route below
       // (list order determines match precedence for sibling routes), so a

@@ -67,6 +67,14 @@ class OrganizationContextController extends Notifier<OrganizationContextState> {
     await restore();
   }
 
+  /// Real PATCH /organizations/:organizationId (name only — Product Task
+  /// 080). Restores afterward so the refreshed name is reflected everywhere
+  /// this context is read (Workspace's organization switcher, etc.).
+  Future<void> updateOrganizationName({required String organizationId, required String name}) async {
+    await ref.read(organizationsApiProvider).update(organizationId, name);
+    await restore();
+  }
+
   /// Client-side-only context change; no backend switch endpoint exists or
   /// is approved.
   Future<void> selectOrganization(String organizationId) async {
