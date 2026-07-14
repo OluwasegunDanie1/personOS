@@ -626,6 +626,145 @@ void main() {
     });
   });
 
+  group('PeopleApi.update request construction and response parsing (Product Task 047)', () {
+    Map<String, dynamic> summaryResponse({String status = 'ACTIVE'}) => {
+      'success': true,
+      'data': {
+        'person': {
+          'id': 'p1',
+          'firstName': 'Ada',
+          'lastName': 'Lovelace',
+          'email': null,
+          'phone': null,
+          'status': status,
+          'avatarUrl': null,
+          'joinedAt': '2026-01-01T00:00:00.000Z',
+        },
+      },
+    };
+
+    test('PATCHes the organization- and person-scoped endpoint', () async {
+      final adapter = _FakeAdapter((options) async => _jsonBody(summaryResponse(), 200));
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await PeopleApi(
+        dio,
+      ).update(organizationId: 'org-1', personId: 'p1', firstName: const FieldUpdate.value('Updated'));
+
+      expect(adapter.lastRequest!.path, '/organizations/org-1/people/p1');
+      expect(adapter.lastRequest!.method, 'PATCH');
+    });
+
+    test('an omitted field is absent from the request body entirely', () async {
+      final adapter = _FakeAdapter((options) async => _jsonBody(summaryResponse(), 200));
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await PeopleApi(
+        dio,
+      ).update(organizationId: 'org-1', personId: 'p1', firstName: const FieldUpdate.value('Updated'));
+
+      final body = adapter.lastRequest!.data as Map<String, dynamic>;
+      expect(body.keys, {'firstName'});
+    });
+
+    test('sends exact JSON field names for every changed field at once', () async {
+      final adapter = _FakeAdapter((options) async => _jsonBody(summaryResponse(), 200));
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await PeopleApi(dio).update(
+        organizationId: 'org-1',
+        personId: 'p1',
+        firstName: const FieldUpdate.value('Ada'),
+        lastName: const FieldUpdate.value('Lovelace'),
+        email: const FieldUpdate.value('ada@example.com'),
+        phone: const FieldUpdate.value('+1234567890'),
+        status: const FieldUpdate.value(PersonStatus.inactive),
+        gender: const FieldUpdate.value(PersonGender.female),
+        dateOfBirth: const FieldUpdate.value('2001-07-14'),
+        address: const FieldUpdate.value('221B Baker Street'),
+      );
+
+      final body = adapter.lastRequest!.data as Map<String, dynamic>;
+      expect(body, {
+        'firstName': 'Ada',
+        'lastName': 'Lovelace',
+        'email': 'ada@example.com',
+        'phone': '+1234567890',
+        'status': 'INACTIVE',
+        'gender': 'FEMALE',
+        'dateOfBirth': '2001-07-14',
+        'address': '221B Baker Street',
+      });
+    });
+
+    test('explicit null is preserved for every nullable field via FieldUpdate.clear', () async {
+      final adapter = _FakeAdapter((options) async => _jsonBody(summaryResponse(), 200));
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await PeopleApi(dio).update(
+        organizationId: 'org-1',
+        personId: 'p1',
+        email: const FieldUpdate.clear(),
+        phone: const FieldUpdate.clear(),
+        gender: const FieldUpdate.clear(),
+        dateOfBirth: const FieldUpdate.clear(),
+        address: const FieldUpdate.clear(),
+      );
+
+      final body = adapter.lastRequest!.data as Map<String, dynamic>;
+      expect(body, {'email': null, 'phone': null, 'gender': null, 'dateOfBirth': null, 'address': null});
+    });
+
+    test('dateOfBirth is sent as a plain YYYY-MM-DD string, never a timestamp', () async {
+      final adapter = _FakeAdapter((options) async => _jsonBody(summaryResponse(), 200));
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await PeopleApi(
+        dio,
+      ).update(organizationId: 'org-1', personId: 'p1', dateOfBirth: const FieldUpdate.value('2001-01-05'));
+
+      final body = adapter.lastRequest!.data as Map<String, dynamic>;
+      expect(body['dateOfBirth'], '2001-01-05');
+      expect(body['dateOfBirth'], isA<String>());
+      expect((body['dateOfBirth'] as String).contains('T'), isFalse);
+      expect((body['dateOfBirth'] as String).contains('Z'), isFalse);
+    });
+
+    test('an unmentioned (omit) field can never enter the request body, even alongside other changes', () async {
+      final adapter = _FakeAdapter((options) async => _jsonBody(summaryResponse(), 200));
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      await PeopleApi(dio).update(
+        organizationId: 'org-1',
+        personId: 'p1',
+        firstName: const FieldUpdate.value('Ada'),
+        address: const FieldUpdate.clear(),
+      );
+
+      final body = adapter.lastRequest!.data as Map<String, dynamic>;
+      expect(body.keys, {'firstName', 'address'});
+      expect(body.containsKey('lastName'), isFalse);
+      expect(body.containsKey('email'), isFalse);
+      expect(body.containsKey('phone'), isFalse);
+      expect(body.containsKey('status'), isFalse);
+      expect(body.containsKey('gender'), isFalse);
+      expect(body.containsKey('dateOfBirth'), isFalse);
+    });
+
+    test('parses the response through the existing narrower Person summary shape, not PersonDetail', () async {
+      final adapter = _FakeAdapter((options) async => _jsonBody(summaryResponse(status: 'INACTIVE'), 200));
+      final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+      final result = await PeopleApi(
+        dio,
+      ).update(organizationId: 'org-1', personId: 'p1', status: const FieldUpdate.value(PersonStatus.inactive));
+
+      expect(result, isA<PersonSummary>());
+      expect(result.status, PersonStatus.inactive);
+      expect(result.firstName, 'Ada');
+    });
+  });
+
   group('PersonDetail parsing (Product Task 041)', () {
     Map<String, dynamic> detailPersonJson({Map<String, dynamic> overrides = const {}}) => {
       'id': 'p1',

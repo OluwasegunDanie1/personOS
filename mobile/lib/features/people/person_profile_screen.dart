@@ -597,10 +597,9 @@ class _NotesStructuralRow extends StatelessWidget {
   }
 }
 
-/// Create Follow-up is now interactive (Product Task 043), pushing
-/// /people/:personId/follow-ups/create. Edit Person remains visually present
-/// but disabled (onPressed: null renders Flutter's standard disabled button
-/// treatment), per Task 041 ruling M — not implemented in this task.
+/// Create Follow-up (Product Task 043) and Edit Person (Product Task 047)
+/// are both interactive, pushing /people/:personId/follow-ups/create and
+/// /people/:personId/edit respectively.
 class _BottomActions extends StatelessWidget {
   const _BottomActions({required this.personId});
 
@@ -624,7 +623,7 @@ class _BottomActions extends StatelessWidget {
           width: double.infinity,
           height: 52,
           child: OutlinedButton(
-            onPressed: null,
+            onPressed: () => context.push('/people/$personId/edit'),
             style: OutlinedButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
             child: const Text('Edit Person', style: TextStyle(fontWeight: FontWeight.w700)),
           ),

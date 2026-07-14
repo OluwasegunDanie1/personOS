@@ -380,7 +380,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Create Follow-up is interactive (Product Task 043); Edit Person remains disabled', (
+  testWidgets('Create Follow-up (Product Task 043) and Edit Person (Product Task 047) are both interactive', (
     WidgetTester tester,
   ) async {
     await _pumpProfileScreen(tester, detailHandler: ({required organizationId, required personId}) async => _fullDetail());
@@ -389,7 +389,7 @@ void main() {
     expect(createButton.onPressed, isNotNull);
 
     final editButton = tester.widget<OutlinedButton>(find.widgetWithText(OutlinedButton, 'Edit Person'));
-    expect(editButton.onPressed, isNull);
+    expect(editButton.onPressed, isNotNull);
   });
 
   testWidgets('no green presence dot is rendered', (WidgetTester tester) async {

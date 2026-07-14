@@ -186,6 +186,36 @@ class PersonProfileController extends Notifier<PersonProfileState> {
     await _load(generation: generation);
   }
 
+  /// Narrow Detail-only refresh (Product Task 047): the real GET refresh a
+  /// successful Edit Person PATCH triggers. Reuses the same [_generation]
+  /// counter as [_load]/[retry] (Edit can only be entered from an already-
+  /// loaded Profile, so there is never a genuinely concurrent initial load
+  /// to race against) but — unlike [_load] — touches only [detail]; journey,
+  /// stages, attendanceSummary, and the Follow-up region's own state are
+  /// left completely untouched, so a successful edit never forces a
+  /// redundant Journey/Attendance/Follow-up reload. On failure, the last
+  /// known-good [detail] is deliberately left in place rather than cleared
+  /// or replaced by locally-edited values — this method never constructs a
+  /// PersonDetail itself, only ever applies what the real GET returns.
+  Future<void> refreshDetail() async {
+    if (openingOrganizationId.isEmpty) return;
+    final generation = ++_generation;
+
+    try {
+      final detail = await ref
+          .read(peopleApiProvider)
+          .detail(organizationId: openingOrganizationId, personId: personId);
+
+      if (!_isCurrent(generation)) return;
+
+      state = state.copyWith(detail: () => detail);
+    } catch (_) {
+      // Deliberately silent: a failed background refresh must not erase a
+      // valid, already-rendered Profile, and must not surface the edited
+      // (unconfirmed) form values as if they were authoritative.
+    }
+  }
+
   /// Region-specific retry/refresh for "Upcoming Follow-ups" only — used both
   /// for a manual retry after a region error and as the real GET refresh a
   /// successful Create Follow-up triggers. Never touches Profile core state.

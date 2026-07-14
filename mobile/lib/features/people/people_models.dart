@@ -83,6 +83,38 @@ DateTime parseDateOnly(String value) {
   return DateTime.utc(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
 }
 
+/// Inverse of [parseDateOnly]: formats a date-only value as exact YYYY-MM-DD
+/// using .year/.month/.day directly (never .toLocal()), so a value read from
+/// Person Detail and a value picked via a calendar-date-only picker compare
+/// and serialize identically regardless of device timezone. Used both for
+/// Update Person's request body (Product Task 047) and for comparing a
+/// picked date against Person Detail's stored value.
+String formatDateOnly(DateTime dateOnly) {
+  final year = dateOnly.year.toString().padLeft(4, '0');
+  final month = dateOnly.month.toString().padLeft(2, '0');
+  final day = dateOnly.day.toString().padLeft(2, '0');
+  return '$year-$month-$day';
+}
+
+/// Three-state sentinel distinguishing "field omitted" from "field
+/// explicitly cleared to null" from "field set to a real value" — the exact
+/// distinction Update Person's PATCH contract requires (Product Task 045/
+/// 047) and that a plain nullable Dart parameter cannot express (a bare
+/// `String? value` cannot tell "not supplied" apart from "supplied as
+/// null"). [PeopleApi.update] uses one of these per nullable field so an
+/// omitted field is structurally impossible to send, and an explicit clear
+/// is structurally impossible to confuse with omission.
+class FieldUpdate<T> {
+  const FieldUpdate.value(T value) : _value = value, isSet = true;
+  const FieldUpdate.clear() : _value = null, isSet = true;
+  const FieldUpdate.omit() : _value = null, isSet = false;
+
+  final T? _value;
+  final bool isSet;
+
+  T? get value => _value;
+}
+
 /// Detail-only (Product Task 039): a Tag as returned by Person Detail's
 /// read-only `tags` field. Not part of the approved Person Profile frozen
 /// composition (Task 038 §8), so not currently rendered anywhere, but

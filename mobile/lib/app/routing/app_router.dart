@@ -11,6 +11,7 @@ import '../../features/organizations/organization_context_controller.dart';
 import '../../features/organizations/organization_setup_screen.dart';
 import '../../features/people/add_person_screen.dart';
 import '../../features/people/create_follow_up_screen.dart';
+import '../../features/people/edit_person_screen.dart';
 import '../../features/people/people_screen.dart';
 import '../../features/people/person_profile_screen.dart';
 import '../../features/workspace/workspace_screen.dart';
@@ -103,6 +104,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/people/:personId/follow-ups/create',
         builder: (context, state) => CreateFollowUpScreen(personId: state.pathParameters['personId']!),
+      ),
+      // Also pushed above the shell — personId only, no organizationId, no
+      // PersonDetail/PersonSummary passed as route state (Product Task
+      // 047). Edit Person owns its own authoritative Person Detail load.
+      GoRoute(
+        path: '/people/:personId/edit',
+        builder: (context, state) => EditPersonScreen(personId: state.pathParameters['personId']!),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) => PrimaryNavigationShell(navigationShell: navigationShell),

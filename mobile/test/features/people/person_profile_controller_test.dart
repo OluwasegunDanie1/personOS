@@ -293,6 +293,102 @@ void main() {
     expect(state2.detail!.id, 'person-2');
   });
 
+  group('refreshDetail (Product Task 047: narrow Detail-only refresh after Edit Person success)', () {
+    test('performs a real new GET Detail request and applies the refreshed value as Profile authority', () async {
+      var callCount = 0;
+      buildContainer(
+        initialOrgState: _orgA,
+        detailHandler: ({required organizationId, required personId}) async {
+          callCount++;
+          if (callCount == 1) return _detail();
+          return _detail(id: 'refreshed');
+        },
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(api.detailCallCount, 1);
+
+      await container.read(personProfileControllerProvider('person-1').notifier).refreshDetail();
+
+      expect(api.detailCallCount, 2);
+      expect(container.read(personProfileControllerProvider('person-1')).detail!.id, 'refreshed');
+    });
+
+    test('never touches journey/stages/attendanceSummary/Follow-up state', () async {
+      buildContainer(
+        initialOrgState: _orgA,
+        followUpsHandler: ({required organizationId, required personId}) async =>
+            FollowUpListResult(followUps: [_followUp('f1')], nextCursor: null),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(api.journeyCallCount, 1);
+      expect(api.stagesCallCount, 1);
+      expect(api.summaryCallCount, 1);
+      expect(api.followUpsCallCount, 1);
+
+      await container.read(personProfileControllerProvider('person-1').notifier).refreshDetail();
+
+      expect(api.journeyCallCount, 1, reason: 'refreshDetail must never re-trigger a Journey reload');
+      expect(api.stagesCallCount, 1, reason: 'refreshDetail must never re-trigger a Journey Stages reload');
+      expect(api.summaryCallCount, 1, reason: 'refreshDetail must never re-trigger an Attendance Summary reload');
+      expect(api.followUpsCallCount, 1, reason: 'refreshDetail must never re-trigger a Follow-up reload');
+
+      final state = container.read(personProfileControllerProvider('person-1'));
+      expect(state.journey, isNotNull);
+      expect(state.stages, isNotNull);
+      expect(state.attendanceSummary, isNotNull);
+      expect(state.followUps, isNotEmpty);
+    });
+
+    test('a stale Organization A refreshDetail success is discarded after switching to Organization B', () async {
+      final refreshGate = Completer<PersonDetail>();
+      var callCount = 0;
+      buildContainer(
+        initialOrgState: _orgA,
+        detailHandler: ({required organizationId, required personId}) {
+          callCount++;
+          if (callCount == 1) return Future.value(_detail());
+          return refreshGate.future;
+        },
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      final refreshFuture = container.read(personProfileControllerProvider('person-1').notifier).refreshDetail();
+
+      orgController.emit(_orgB);
+      await Future<void>.delayed(Duration.zero);
+      expect(container.read(personProfileControllerProvider('person-1')).shouldClose, isTrue);
+
+      refreshGate.complete(_detail(id: 'stale-refreshed'));
+      await refreshFuture;
+
+      final state = container.read(personProfileControllerProvider('person-1'));
+      expect(
+        state.detail!.id,
+        'person-1',
+        reason: 'the stale org-a refreshDetail success must never become authoritative after switching to org-b',
+      );
+    });
+
+    test('a refreshDetail failure leaves the last known-good Detail in place rather than fabricating or clearing it', () async {
+      var callCount = 0;
+      buildContainer(
+        initialOrgState: _orgA,
+        detailHandler: ({required organizationId, required personId}) async {
+          callCount++;
+          if (callCount == 1) return _detail();
+          throw Exception('refresh failed');
+        },
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      await container.read(personProfileControllerProvider('person-1').notifier).refreshDetail();
+
+      final state = container.read(personProfileControllerProvider('person-1'));
+      expect(state.status, ProfileLoadStatus.loaded, reason: 'a failed background refresh must not erase a valid Profile');
+      expect(state.detail, isNotNull);
+    });
+  });
+
   group('Profile Follow-up region', () {
     test('loads Follow-ups for the current person and selected organization using person_id, dueDate_asc, limit 100', () async {
       buildContainer(

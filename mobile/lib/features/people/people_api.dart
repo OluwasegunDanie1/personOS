@@ -125,6 +125,52 @@ class PeopleApi {
     return AttendanceSummary.fromJson(data['attendanceSummary'] as Map<String, dynamic>);
   }
 
+  /// Integrates the real, implemented PATCH
+  /// /organizations/:organizationId/people/:personId endpoint (Product Task
+  /// 045's write-authority correction, integrated by Product Task 047).
+  /// Every parameter defaults to [FieldUpdate.omit] so a field the caller
+  /// never mentions can never enter the request body — the changed-fields
+  /// diff is entirely the caller's (EditPersonController's) responsibility;
+  /// this method only ever serializes whatever [FieldUpdate]s it is given.
+  /// [FieldUpdate.clear] always serializes JSON `null` (never omitted, never
+  /// treated as "no change"), which is what lets the backend distinguish
+  /// omission from explicit clearing for the five nullable fields. Parses
+  /// the response through the existing, narrower Person summary shape
+  /// (PersonSummary.fromJson) — never PersonDetail — since Update Person's
+  /// response deliberately never echoes gender/dateOfBirth/address/
+  /// currentJourneyStage (13_API_Specification.md's Update Person section).
+  Future<PersonSummary> update({
+    required String organizationId,
+    required String personId,
+    FieldUpdate<String> firstName = const FieldUpdate.omit(),
+    FieldUpdate<String> lastName = const FieldUpdate.omit(),
+    FieldUpdate<String> email = const FieldUpdate.omit(),
+    FieldUpdate<String> phone = const FieldUpdate.omit(),
+    FieldUpdate<PersonStatus> status = const FieldUpdate.omit(),
+    FieldUpdate<PersonGender> gender = const FieldUpdate.omit(),
+    // Date-only YYYY-MM-DD, never a DateTime — this is a calendar date, not
+    // an absolute instant, and must never be routed through
+    // .toUtc().toIso8601String() the way Follow-up.dueDate is.
+    FieldUpdate<String> dateOfBirth = const FieldUpdate.omit(),
+    FieldUpdate<String> address = const FieldUpdate.omit(),
+  }) async {
+    final data = <String, dynamic>{
+      if (firstName.isSet) 'firstName': firstName.value,
+      if (lastName.isSet) 'lastName': lastName.value,
+      if (email.isSet) 'email': email.value,
+      if (phone.isSet) 'phone': phone.value,
+      if (status.isSet) 'status': status.value?.toApiValue(),
+      if (gender.isSet) 'gender': gender.value?.toApiValue(),
+      if (dateOfBirth.isSet) 'dateOfBirth': dateOfBirth.value,
+      if (address.isSet) 'address': address.value,
+    };
+
+    final response = await _dio.patch<dynamic>('/organizations/$organizationId/people/$personId', data: data);
+
+    final responseData = unwrapEnvelope(response) as Map<String, dynamic>;
+    return PersonSummary.fromJson(responseData['person'] as Map<String, dynamic>);
+  }
+
   /// Integrates the real, implemented GET /organizations/:organizationId/follow-ups
   /// endpoint (Product Task 043), scoped to exactly one bounded person-scoped
   /// page: person_id, sort=dueDate_asc (the real approved sort value — not
