@@ -34,6 +34,17 @@ void main() {
             'upcomingEvents': [
               {'id': 'event-1', 'title': 'Sunday Service', 'startDate': '2026-07-19T09:00:00.000Z'},
             ],
+            'recentMembers': [
+              {'id': 'person-1', 'firstName': 'Sarah', 'lastName': 'Johnson', 'joinedAt': '2026-05-20T09:00:00.000Z'},
+            ],
+            'pendingTasks': [
+              {
+                'id': 'fu-1',
+                'title': 'Follow up with Alex Smith',
+                'description': 'Member follow-up',
+                'dueDate': '2026-07-20T09:00:00.000Z',
+              },
+            ],
           },
         }),
         200,
@@ -53,5 +64,44 @@ void main() {
     expect(summary.upcomingEvents, hasLength(1));
     expect(summary.upcomingEvents.single.id, 'event-1');
     expect(summary.upcomingEvents.single.title, 'Sunday Service');
+    expect(summary.recentMembers, hasLength(1));
+    expect(summary.recentMembers.single.id, 'person-1');
+    expect(summary.recentMembers.single.displayName, 'Sarah Johnson');
+    expect(summary.pendingTasks, hasLength(1));
+    expect(summary.pendingTasks.single.id, 'fu-1');
+    expect(summary.pendingTasks.single.title, 'Follow up with Alex Smith');
+    expect(summary.pendingTasks.single.description, 'Member follow-up');
+  });
+
+  test('fetch() parses empty recentMembers/pendingTasks lists and a null pendingTasks description/dueDate', () async {
+    final adapter = _FakeAdapter(
+      (options) async => ResponseBody.fromString(
+        jsonEncode({
+          'success': true,
+          'data': {
+            'totalPeople': 0,
+            'newPeople': 0,
+            'pendingFollowUps': 0,
+            'upcomingEvents': [],
+            'recentMembers': [],
+            'pendingTasks': [
+              {'id': 'fu-2', 'title': 'Review new member applications', 'description': null, 'dueDate': null},
+            ],
+          },
+        }),
+        200,
+        headers: {
+          Headers.contentTypeHeader: ['application/json'],
+        },
+      ),
+    );
+    final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+    final summary = await DashboardApi(dio).fetch('org-1');
+
+    expect(summary.recentMembers, isEmpty);
+    expect(summary.pendingTasks, hasLength(1));
+    expect(summary.pendingTasks.single.description, isNull);
+    expect(summary.pendingTasks.single.dueDate, isNull);
   });
 }
