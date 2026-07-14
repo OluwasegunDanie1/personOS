@@ -14,6 +14,8 @@ import '../../features/people/create_follow_up_screen.dart';
 import '../../features/people/edit_person_screen.dart';
 import '../../features/people/people_screen.dart';
 import '../../features/people/person_profile_screen.dart';
+import '../../features/workspace/organization_members_screen.dart';
+import '../../features/workspace/roles_permissions_screen.dart';
 import '../../features/workspace/workspace_screen.dart';
 import '../splash_screen.dart';
 import 'primary_navigation_shell.dart';
@@ -112,6 +114,13 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/people/:personId/edit',
         builder: (context, state) => EditPersonScreen(personId: state.pathParameters['personId']!),
       ),
+      // Also pushed above the shell — no route parameters, since both
+      // screens use only the already-selected organization context (Product
+      // Task 052). No direct frozen "Organization Members" list screen
+      // exists; Roles & Permissions matches design/ui-reference/12.png's own
+      // back-affordance/no-bottom-nav composition.
+      GoRoute(path: '/workspace/members', builder: (context, state) => const OrganizationMembersScreen()),
+      GoRoute(path: '/workspace/roles', builder: (context, state) => const RolesPermissionsScreen()),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) => PrimaryNavigationShell(navigationShell: navigationShell),
         branches: [

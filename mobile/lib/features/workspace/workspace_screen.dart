@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../app/theme/app_colors.dart';
 import '../auth/auth_models.dart';
@@ -9,12 +10,14 @@ import '../organizations/organization_models.dart';
 
 /// Matches design/ui-reference/12.png's "My Profile" identity block and
 /// red-outline Log Out action. The reference's full "More" menu also lists
-/// Roles & Permissions, Integrations, Security, Appearance, Reports &
-/// Analytics, Billing, Settings, Help Center, and About — none of those
-/// have an approved backend capability in Task 029's scope, so rendering
-/// them (even disabled) would visually promise functionality this build
-/// does not have. Only identity display, organization switching (client-
-/// side context per 16_Security.md), and logout are implemented.
+/// Integrations, Security, Appearance, Reports & Analytics, Billing,
+/// Settings, Help Center, and About — none of those have an approved
+/// backend capability, so rendering them (even disabled) would visually
+/// promise functionality this build does not have. Organization Members and
+/// Roles & Permissions are now real, interactive entries (Product Task 052,
+/// integrating Product Task 050's read-only API authority); everything else
+/// remains identity display, organization switching (client-side context
+/// per 16_Security.md), and logout.
 class WorkspaceScreen extends ConsumerWidget {
   const WorkspaceScreen({super.key});
 
@@ -38,6 +41,8 @@ class WorkspaceScreen extends ConsumerWidget {
           const SizedBox(height: 24),
           if (organizationContext is OrganizationContextActive)
             _OrganizationSection(context: organizationContext, ref: ref),
+          const SizedBox(height: 24),
+          const _ManageOrganizationSection(),
           const SizedBox(height: 32),
           SizedBox(
             width: double.infinity,
@@ -156,6 +161,81 @@ class _OrganizationTile extends StatelessWidget {
       title: Text(organization.name, style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
       subtitle: Text(organization.role.name, style: const TextStyle(color: AppColors.textSecondary)),
       trailing: isSelected ? const Icon(Icons.check_circle, color: AppColors.brandPrimary) : null,
+    );
+  }
+}
+
+/// Matches design/ui-reference/12.png's "More" menu list-item style (icon
+/// circle, title, subtitle, trailing chevron) for the two now-real entries:
+/// Organization Members and Roles & Permissions (Product Task 052).
+/// Integrations and every other frozen "More" menu item remain omitted —
+/// none has an approved backend capability.
+class _ManageOrganizationSection extends StatelessWidget {
+  const _ManageOrganizationSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          'Organization',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textSecondary),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          decoration: BoxDecoration(
+            color: AppColors.surfaceCard,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.borderSubtle),
+          ),
+          child: Column(
+            children: [
+              _ManageOrganizationTile(
+                icon: Icons.groups_outlined,
+                title: 'Organization Members',
+                subtitle: 'View everyone with access to this organization',
+                onTap: () => context.push('/workspace/members'),
+              ),
+              const Divider(height: 1),
+              _ManageOrganizationTile(
+                icon: Icons.shield_outlined,
+                title: 'Roles & Permissions',
+                subtitle: 'View roles and their real assigned permissions',
+                onTap: () => context.push('/workspace/roles'),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ManageOrganizationTile extends StatelessWidget {
+  const _ManageOrganizationTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      onTap: onTap,
+      leading: CircleAvatar(
+        backgroundColor: AppColors.brandPrimary.withValues(alpha: 0.12),
+        child: Icon(icon, color: AppColors.brandPrimary),
+      ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textPrimary)),
+      subtitle: Text(subtitle, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+      trailing: const Icon(Icons.chevron_right, color: AppColors.textSecondary),
     );
   }
 }
