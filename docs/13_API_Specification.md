@@ -123,6 +123,11 @@ Public endpoints for the current implemented boundary:
 POST /auth/login
 POST /auth/refresh
 POST /auth/logout
+POST /auth/register
+POST /auth/forgot-password
+POST /auth/reset-password
+
+GET /auth/me is authenticated, not public — it is the one Authentication Endpoint that requires the global access-token guard.
 
 The global guard:
 
@@ -146,7 +151,34 @@ Authentication Endpoints
 Register
 POST /auth/register
 
-Creates a user account.
+Creates exactly one ACTIVE User (Product Task 072). Public endpoint, rate limited to 5 requests per 15 minutes per client IP.
+
+Request fields:
+
+firstName
+lastName
+email
+password
+
+firstName and lastName are trimmed; email is normalized (trimmed, lower-cased) before the duplicate check and before persistence, identically to Login's own email normalization. password must be at least 8 characters (the approved v1 minimum baseline; no stricter complexity rule is enforced). Any additional field is rejected by the existing global whitelist validation.
+
+Success response data (HTTP 201, standard success envelope):
+
+{
+  "user": {
+    "id": "string",
+    "firstName": "string",
+    "lastName": "string",
+    "email": "string",
+    "phone": "string | null",
+    "status": "ACTIVE",
+    "lastLogin": "string | null",
+    "createdAt": "string",
+    "updatedAt": "string"
+  }
+}
+
+A duplicate email returns EMAIL_ALREADY_REGISTERED (HTTP 409). Registration never creates an Organization, Role, or OrganizationMembership row — organization context selection remains its own separate, explicit workflow, exactly as Login already establishes. Registration never auto-issues access/refresh tokens; the client calls Login afterward. There is no email-verification gate: User.status is set directly to ACTIVE (the schema's EmailVerificationToken table exists but has no approved v1 API contract and is not used here).
 
 Login
 POST /auth/login
@@ -223,19 +255,70 @@ Logout does not use a special envelope exception.
 Forgot Password
 POST /auth/forgot-password
 
-Requests a password reset.
+Requests a password reset (Product Task 072). Public endpoint, rate limited to 5 requests per 15 minutes per client IP.
 
-The response must not reveal whether an email address exists.
+Request fields:
+
+email
+
+Success response data (HTTP 200, standard success envelope) is always identical regardless of whether the email resolves to a real User — this is the sole approved non-disclosure mechanism:
+
+{
+  "message": "If an account exists for this email, password reset instructions will be sent."
+}
+
+An unknown email creates no PasswordResetToken row and produces the exact same response as a known email. When a real User is found, a cryptographically secure raw reset token is generated; only its SHA-256 hash is persisted (PasswordResetToken.tokenHash), with expiresAt set to exactly 1 hour from creation and usedAt null. The raw token itself is never logged and never returned in production.
+
+Outside production only (process.env.NODE_ENV !== "production"), the response additionally includes:
+
+{
+  "developmentResetToken": "string"
+}
+
+This is a controlled, explicitly non-production mechanism for truthfully exercising the reset flow without any email/SMS delivery integration, which does not exist anywhere in this codebase and is out of scope. Production must never include developmentResetToken in any response, regardless of outcome.
 
 Reset Password
 POST /auth/reset-password
 
-Resets a password using a valid reset token.
+Completes a password reset using a valid raw reset token (Product Task 072). Public endpoint.
+
+Request fields:
+
+token
+newPassword
+
+token is the raw value the client obtained (via developmentResetToken outside production, or a future approved delivery mechanism). newPassword must be at least 8 characters, the same baseline Register enforces. The supplied token is hashed and looked up by that hash; an absent, expired (past its 1-hour expiresAt), or already-used (non-null usedAt) token all return the same INVALID_RESET_TOKEN error (HTTP 401) — the response never reveals which of these three states applied, mirroring Login's INVALID_CREDENTIALS non-disclosure convention exactly.
+
+On success: the token is claimed exactly once via an atomic conditional update (matched by id and usedAt: null), so a concurrent replay of the same raw token can never succeed twice — the loser receives INVALID_RESET_TOKEN identically to an already-used token. User.passwordHash is updated (Argon2id, via the same PasswordHashService Login and Register use) and every other active RefreshToken for that User is revoked in the same transaction, ending all existing sessions.
+
+Success response data (HTTP 200, standard success envelope):
+
+{
+  "success": true
+}
 
 Current User
 GET /auth/me
 
-Returns the authenticated user and the active organization context where one has been separately established.
+Returns the authenticated User (Product Task 072). Requires a valid access token — this is the one Authentication Endpoint that is not public. Accepts no request fields.
+
+Success response data (HTTP 200, standard success envelope):
+
+{
+  "user": {
+    "id": "string",
+    "firstName": "string",
+    "lastName": "string",
+    "email": "string",
+    "phone": "string | null",
+    "status": "ACTIVE | DISABLED",
+    "lastLogin": "string | null",
+    "createdAt": "string",
+    "updatedAt": "string"
+  }
+}
+
+There is no organization-context field on this response: no server-side "active organization" is persisted anywhere in this backend (organization selection remains a Flutter-local-only concept), so none is fabricated here. A future approved organization-context-persistence authority could add this later; it is not part of this contract.
 
 Standard Response Format
 Success Response
@@ -278,6 +361,13 @@ INVALID_REFRESH_TOKEN
 USER_DISABLED
 
 These codes are authoritative for POST /auth/login, POST /auth/refresh, and POST /auth/logout and must not be paired with a conflicting AUTH_-prefixed equivalent for the same condition.
+
+Stable v1 codes for Register, Forgot Password, and Reset Password (Product Task 072):
+
+EMAIL_ALREADY_REGISTERED: POST /auth/register supplied an email that already resolves to an existing User.
+INVALID_RESET_TOKEN: POST /auth/reset-password supplied a token that is absent, expired, or already used. One shared code covers all three states — the response never reveals which applied, mirroring INVALID_CREDENTIALS's own non-disclosure convention.
+
+POST /auth/forgot-password never returns a distinct error code for an unknown email; it always returns the same HTTP 200 non-disclosing message described above.
 
 Stable v1 codes for the authenticated-request boundary (all protected routes):
 

@@ -76,4 +76,123 @@ describe('AuthController throttling', () => {
 
     await app.close();
   });
+
+  it('rejects the 6th request within the window with HTTP 429 (register limit is 5/15min)', async () => {
+    const authService = {
+      login: jest.fn(),
+      refresh: jest.fn(),
+      logout: jest.fn(),
+      register: jest.fn().mockResolvedValue({ user: {} }),
+      forgotPassword: jest.fn(),
+      resetPassword: jest.fn(),
+      me: jest.fn(),
+    };
+
+    const moduleRef = await Test.createTestingModule({
+      imports: [ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 5 }])],
+      controllers: [AuthController],
+      providers: [{ provide: AuthService, useValue: authService }, ThrottlerGuard],
+    }).compile();
+
+    const app: INestApplication = moduleRef.createNestApplication();
+    await app.init();
+    await app.listen(0);
+
+    const address = app.getHttpServer().address();
+    const port = typeof address === 'object' && address ? address.port : 0;
+
+    const postRegister = (): Promise<number> =>
+      new Promise((resolve, reject) => {
+        const payload = JSON.stringify({
+          firstName: 'Grace',
+          lastName: 'Hopper',
+          email: 'grace@example.com',
+          password: 'secret123',
+        });
+        const req = http.request(
+          {
+            host: '127.0.0.1',
+            port,
+            path: '/auth/register',
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) },
+          },
+          (res) => {
+            res.on('data', () => undefined);
+            res.on('end', () => resolve(res.statusCode ?? 0));
+          },
+        );
+        req.on('error', reject);
+        req.write(payload);
+        req.end();
+      });
+
+    const statuses: number[] = [];
+    for (let i = 0; i < 6; i += 1) {
+      statuses.push(await postRegister());
+    }
+
+    expect(statuses.slice(0, 5)).toEqual([201, 201, 201, 201, 201]);
+    expect(statuses[5]).toBe(429);
+
+    await app.close();
+  });
+
+  it('rejects the 6th request within the window with HTTP 429 (forgot-password limit is 5/15min)', async () => {
+    const authService = {
+      login: jest.fn(),
+      refresh: jest.fn(),
+      logout: jest.fn(),
+      register: jest.fn(),
+      forgotPassword: jest
+        .fn()
+        .mockResolvedValue({ message: 'If an account exists for this email, password reset instructions will be sent.' }),
+      resetPassword: jest.fn(),
+      me: jest.fn(),
+    };
+
+    const moduleRef = await Test.createTestingModule({
+      imports: [ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 5 }])],
+      controllers: [AuthController],
+      providers: [{ provide: AuthService, useValue: authService }, ThrottlerGuard],
+    }).compile();
+
+    const app: INestApplication = moduleRef.createNestApplication();
+    await app.init();
+    await app.listen(0);
+
+    const address = app.getHttpServer().address();
+    const port = typeof address === 'object' && address ? address.port : 0;
+
+    const postForgotPassword = (): Promise<number> =>
+      new Promise((resolve, reject) => {
+        const payload = JSON.stringify({ email: 'ada@example.com' });
+        const req = http.request(
+          {
+            host: '127.0.0.1',
+            port,
+            path: '/auth/forgot-password',
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload) },
+          },
+          (res) => {
+            res.on('data', () => undefined);
+            res.on('end', () => resolve(res.statusCode ?? 0));
+          },
+        );
+        req.on('error', reject);
+        req.write(payload);
+        req.end();
+      });
+
+    const statuses: number[] = [];
+    for (let i = 0; i < 6; i += 1) {
+      statuses.push(await postForgotPassword());
+    }
+
+    expect(statuses.slice(0, 5)).toEqual([200, 200, 200, 200, 200]);
+    expect(statuses[5]).toBe(429);
+
+    await app.close();
+  });
 });

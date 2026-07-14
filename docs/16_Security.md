@@ -688,12 +688,14 @@ Approved v1 thresholds for the public authentication boundary:
 POST /auth/login: maximum 5 requests per 60 seconds per client IP
 POST /auth/refresh: maximum 10 requests per 60 seconds per client IP
 POST /auth/logout: maximum 20 requests per 60 seconds per client IP
+POST /auth/register: maximum 5 requests per 15 minutes per client IP (Product Task 072)
+POST /auth/forgot-password: maximum 5 requests per 15 minutes per client IP (Product Task 072)
 
 For this boundary, client IP is the sole approved throttling key, resolved through standard NestJS/Express request IP handling. Do not manually parse X-Forwarded-For inside auth controllers. Do not combine the IP key with email, user ID, refresh-token hash, or device fingerprinting for this boundary.
 
 Rate-limit rejection returns 429 Too Many Requests.
 
-These thresholds and the package/keying decision apply specifically to the login/refresh/logout boundary. A generic requirement to rate limit elsewhere in this document does not by itself authorize thresholds, package selection, or keying strategy for other endpoints.
+These thresholds and the package/keying decision apply specifically to the login/refresh/logout/register/forgot-password boundary. A generic requirement to rate limit elsewhere in this document does not by itself authorize thresholds, package selection, or keying strategy for other endpoints. POST /auth/reset-password and GET /auth/me have no endpoint-specific threshold approved beyond the module's default throttler bucket; a distinct threshold for either was not requested and is not invented here.
 
 Trust-Proxy Boundary
 
@@ -718,7 +720,7 @@ Suspicious login monitoring
 
 Persistent account lockout is not part of Relvio v1. Do not add failed-attempt counters or locked-until fields.
 
-Rate limiting and brute-force protection remain required. Exact thresholds, package, keying strategy, and trust-proxy configuration for the login/refresh/logout boundary are resolved above. The forgot-password rate-limit threshold remains unresolved and must be decided before that endpoint is publicly exposed.
+Rate limiting and brute-force protection remain required. Exact thresholds, package, keying strategy, and trust-proxy configuration for the login/refresh/logout/register/forgot-password boundary are resolved above (Product Task 072 resolved the register and forgot-password thresholds; they are no longer unresolved).
 
 Security controls must avoid exposing whether a specific email account exists.
 

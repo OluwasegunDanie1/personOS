@@ -64,6 +64,17 @@ describe('Auth route composition', () => {
     });
   }
 
+  function get(path: string, headers: Record<string, string> = {}): Promise<number> {
+    return new Promise((resolve, reject) => {
+      const req = http.request({ host: '127.0.0.1', port, path, method: 'GET', headers }, (res) => {
+        res.on('data', () => undefined);
+        res.on('end', () => resolve(res.statusCode ?? 0));
+      });
+      req.on('error', reject);
+      req.end();
+    });
+  }
+
   it('resolves POST /api/v1/auth/login and remains public (no access token supplied)', async () => {
     const status = await post('/api/v1/auth/login', { email: 'not-an-email', password: '' });
 
@@ -85,9 +96,43 @@ describe('Auth route composition', () => {
     expect(status).not.toBe(401);
   });
 
+  it('resolves POST /api/v1/auth/register and remains public (no access token supplied)', async () => {
+    const status = await post('/api/v1/auth/register', { email: 'not-an-email', password: '' });
+
+    expect(status).not.toBe(404);
+    expect(status).not.toBe(401);
+  });
+
+  it('resolves POST /api/v1/auth/forgot-password and remains public (no access token supplied)', async () => {
+    const status = await post('/api/v1/auth/forgot-password', { email: 'not-an-email' });
+
+    expect(status).not.toBe(404);
+    expect(status).not.toBe(401);
+  });
+
+  it('resolves POST /api/v1/auth/reset-password and remains public (no access token supplied)', async () => {
+    const status = await post('/api/v1/auth/reset-password', { token: '', newPassword: '' });
+
+    expect(status).not.toBe(404);
+    expect(status).not.toBe(401);
+  });
+
+  it('GET /api/v1/auth/me requires authentication (401 with no access token)', async () => {
+    const status = await get('/api/v1/auth/me');
+
+    expect(status).toBe(401);
+  });
+
   it('does not register auth routes outside the /api/v1 prefix', async () => {
     const status = await post('/auth/login', { email: 'not-an-email', password: '' });
 
     expect(status).toBe(404);
+  });
+
+  it('does not register the new auth routes outside the /api/v1 prefix', async () => {
+    expect(await post('/auth/register', {})).toBe(404);
+    expect(await post('/auth/forgot-password', {})).toBe(404);
+    expect(await post('/auth/reset-password', {})).toBe(404);
+    expect(await get('/auth/me')).toBe(404);
   });
 });

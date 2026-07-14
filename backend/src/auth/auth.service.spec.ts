@@ -9,11 +9,16 @@ import { AuthService } from './auth.service';
 
 function createMockPrisma() {
   return {
-    user: { findUnique: jest.fn(), update: jest.fn() },
+    user: { findUnique: jest.fn(), update: jest.fn(), create: jest.fn() },
     refreshToken: {
       findUnique: jest.fn(),
       create: jest.fn(),
       update: jest.fn(),
+      updateMany: jest.fn(),
+    },
+    passwordResetToken: {
+      findUnique: jest.fn(),
+      create: jest.fn(),
       updateMany: jest.fn(),
     },
     $transaction: jest.fn(),
@@ -407,6 +412,312 @@ describe('AuthService', () => {
       await authService.logout({ refreshToken: 'active-token' });
 
       expect(prisma.refreshToken.updateMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('register', () => {
+    const dto = { firstName: '  Grace  ', lastName: '  Hopper  ', email: '  Grace@Example.com  ', password: 'correct-password' };
+
+    it('normalizes email before the duplicate lookup and on the created row', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.user.create.mockResolvedValue(buildUser({ email: 'grace@example.com' }));
+
+      await authService.register(dto as never);
+
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({ where: { email: 'grace@example.com' } });
+      const createArgs = prisma.user.create.mock.calls[0][0];
+      expect(createArgs.data.email).toBe('grace@example.com');
+    });
+
+    it('hashes the password with PasswordHashService, never storing it in plain text', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.user.create.mockResolvedValue(buildUser());
+
+      await authService.register(dto as never);
+
+      const createArgs = prisma.user.create.mock.calls[0][0];
+      expect(createArgs.data.passwordHash).not.toBe('correct-password');
+      expect(await passwordHashService.verify(createArgs.data.passwordHash, 'correct-password')).toBe(true);
+    });
+
+    it('creates the User with status ACTIVE', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.user.create.mockResolvedValue(buildUser());
+
+      await authService.register(dto as never);
+
+      const createArgs = prisma.user.create.mock.calls[0][0];
+      expect(createArgs.data.status).toBe('ACTIVE');
+    });
+
+    it('rejects a duplicate email with EMAIL_ALREADY_REGISTERED and never creates a second User', async () => {
+      prisma.user.findUnique.mockResolvedValue(buildUser({ email: 'grace@example.com' }));
+
+      let error: ApiException | undefined;
+      try {
+        await authService.register(dto as never);
+      } catch (e) {
+        error = e as ApiException;
+      }
+
+      expect(error?.code).toBe(AUTH_ERROR_CODES.EMAIL_ALREADY_REGISTERED);
+      expect(prisma.user.create).not.toHaveBeenCalled();
+    });
+
+    it('never fabricates an Organization, Role, or Membership row (mocked Prisma exposes no such model)', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.user.create.mockResolvedValue(buildUser());
+
+      await authService.register(dto as never);
+
+      expect(Object.keys(prisma).sort()).toEqual(
+        ['user', 'refreshToken', 'passwordResetToken', '$transaction'].sort(),
+      );
+    });
+
+    it('returns a public user excluding passwordHash', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+      prisma.user.create.mockResolvedValue(buildUser());
+
+      const result = await authService.register(dto as never);
+
+      expect(result.user).not.toHaveProperty('passwordHash');
+    });
+  });
+
+  describe('forgotPassword', () => {
+    const originalNodeEnv = process.env.NODE_ENV;
+
+    afterEach(() => {
+      process.env.NODE_ENV = originalNodeEnv;
+    });
+
+    it('returns the exact non-disclosing message for an unknown email and creates no token', async () => {
+      process.env.NODE_ENV = 'production';
+      prisma.user.findUnique.mockResolvedValue(null);
+
+      const result = await authService.forgotPassword({ email: 'nobody@example.com' } as never);
+
+      expect(result).toEqual({
+        message: 'If an account exists for this email, password reset instructions will be sent.',
+      });
+      expect(prisma.passwordResetToken.create).not.toHaveBeenCalled();
+    });
+
+    it('returns the exact same message for a known email (no disclosure difference)', async () => {
+      process.env.NODE_ENV = 'production';
+      prisma.user.findUnique.mockResolvedValue(buildUser());
+      prisma.passwordResetToken.create.mockResolvedValue({});
+
+      const result = await authService.forgotPassword({ email: 'ada@example.com' } as never);
+
+      expect(result.message).toBe(
+        'If an account exists for this email, password reset instructions will be sent.',
+      );
+    });
+
+    it('persists only the token hash, never the raw token, with a 1-hour expiry and null usedAt', async () => {
+      process.env.NODE_ENV = 'test';
+      const user = buildUser();
+      prisma.user.findUnique.mockResolvedValue(user);
+      prisma.passwordResetToken.create.mockResolvedValue({});
+
+      const before = Date.now();
+      const result = await authService.forgotPassword({ email: 'ada@example.com' } as never);
+      const after = Date.now();
+
+      const createArgs = prisma.passwordResetToken.create.mock.calls[0][0];
+      expect(createArgs.data.userId).toBe('user-1');
+      expect(createArgs.data.tokenHash).toBe(opaqueTokenService.hash(result.developmentResetToken!));
+      expect(createArgs.data.tokenHash).not.toBe(result.developmentResetToken);
+      expect(createArgs.data).not.toHaveProperty('usedAt');
+      const expiresAtMs = createArgs.data.expiresAt.getTime();
+      expect(expiresAtMs).toBeGreaterThanOrEqual(before + 60 * 60 * 1000 - 1000);
+      expect(expiresAtMs).toBeLessThanOrEqual(after + 60 * 60 * 1000 + 1000);
+    });
+
+    it('exposes developmentResetToken outside production', async () => {
+      process.env.NODE_ENV = 'development';
+      prisma.user.findUnique.mockResolvedValue(buildUser());
+      prisma.passwordResetToken.create.mockResolvedValue({});
+
+      const result = await authService.forgotPassword({ email: 'ada@example.com' } as never);
+
+      expect(result.developmentResetToken).toBeDefined();
+      expect(typeof result.developmentResetToken).toBe('string');
+    });
+
+    it('never exposes developmentResetToken in production', async () => {
+      process.env.NODE_ENV = 'production';
+      prisma.user.findUnique.mockResolvedValue(buildUser());
+      prisma.passwordResetToken.create.mockResolvedValue({});
+
+      const result = await authService.forgotPassword({ email: 'ada@example.com' } as never);
+
+      expect(result).not.toHaveProperty('developmentResetToken');
+    });
+  });
+
+  describe('resetPassword', () => {
+    function buildResetToken(overrides: Record<string, unknown> = {}) {
+      return {
+        id: 'reset-1',
+        userId: 'user-1',
+        tokenHash: 'irrelevant-in-mock',
+        expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        usedAt: null,
+        createdAt: now,
+        ...overrides,
+      };
+    }
+
+    it('rejects an unknown token', async () => {
+      prisma.passwordResetToken.findUnique.mockResolvedValue(null);
+
+      let error: ApiException | undefined;
+      try {
+        await authService.resetPassword({ token: 'bogus', newPassword: 'new-password-1' } as never);
+      } catch (e) {
+        error = e as ApiException;
+      }
+
+      expect(error?.code).toBe(AUTH_ERROR_CODES.INVALID_RESET_TOKEN);
+    });
+
+    it('rejects an expired token', async () => {
+      prisma.passwordResetToken.findUnique.mockResolvedValue(
+        buildResetToken({ expiresAt: new Date(Date.now() - 1000) }),
+      );
+
+      let error: ApiException | undefined;
+      try {
+        await authService.resetPassword({ token: 'expired', newPassword: 'new-password-1' } as never);
+      } catch (e) {
+        error = e as ApiException;
+      }
+
+      expect(error?.code).toBe(AUTH_ERROR_CODES.INVALID_RESET_TOKEN);
+      expect(prisma.passwordResetToken.updateMany).not.toHaveBeenCalled();
+    });
+
+    it('rejects an already-used token', async () => {
+      prisma.passwordResetToken.findUnique.mockResolvedValue(buildResetToken({ usedAt: new Date() }));
+
+      let error: ApiException | undefined;
+      try {
+        await authService.resetPassword({ token: 'used', newPassword: 'new-password-1' } as never);
+      } catch (e) {
+        error = e as ApiException;
+      }
+
+      expect(error?.code).toBe(AUTH_ERROR_CODES.INVALID_RESET_TOKEN);
+    });
+
+    it('rejects a concurrent replay that loses the atomic single-use claim (updateMany count 0)', async () => {
+      prisma.passwordResetToken.findUnique.mockResolvedValue(buildResetToken());
+      prisma.passwordResetToken.updateMany.mockResolvedValue({ count: 0 });
+
+      let error: ApiException | undefined;
+      try {
+        await authService.resetPassword({ token: 'raced', newPassword: 'new-password-1' } as never);
+      } catch (e) {
+        error = e as ApiException;
+      }
+
+      expect(error?.code).toBe(AUTH_ERROR_CODES.INVALID_RESET_TOKEN);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('claims the token atomically by id + usedAt:null before mutating anything', async () => {
+      prisma.passwordResetToken.findUnique.mockResolvedValue(buildResetToken());
+      prisma.passwordResetToken.updateMany.mockResolvedValue({ count: 1 });
+      prisma.user.update.mockResolvedValue(buildUser());
+      prisma.refreshToken.updateMany.mockResolvedValue({ count: 0 });
+
+      await authService.resetPassword({ token: 'valid', newPassword: 'new-password-1' } as never);
+
+      const claimArgs = prisma.passwordResetToken.updateMany.mock.calls[0][0];
+      expect(claimArgs.where).toEqual({ id: 'reset-1', usedAt: null });
+      expect(claimArgs.data).toEqual({ usedAt: expect.any(Date) });
+    });
+
+    it('updates User.passwordHash with a real Argon2id hash of the new password', async () => {
+      prisma.passwordResetToken.findUnique.mockResolvedValue(buildResetToken());
+      prisma.passwordResetToken.updateMany.mockResolvedValue({ count: 1 });
+      prisma.user.update.mockResolvedValue(buildUser());
+      prisma.refreshToken.updateMany.mockResolvedValue({ count: 0 });
+
+      await authService.resetPassword({ token: 'valid', newPassword: 'brand-new-password' } as never);
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      const transactionArg = prisma.$transaction.mock.calls[0][0];
+      expect(prisma.user.update).toHaveBeenCalledWith({
+        where: { id: 'user-1' },
+        data: { passwordHash: expect.any(String) },
+      });
+      const updateArgs = prisma.user.update.mock.calls[0][0];
+      expect(await passwordHashService.verify(updateArgs.data.passwordHash, 'brand-new-password')).toBe(true);
+      expect(Array.isArray(transactionArg)).toBe(true);
+    });
+
+    it('revokes every other active refresh token for that user in the same transaction', async () => {
+      prisma.passwordResetToken.findUnique.mockResolvedValue(buildResetToken());
+      prisma.passwordResetToken.updateMany.mockResolvedValue({ count: 1 });
+      prisma.user.update.mockResolvedValue(buildUser());
+      prisma.refreshToken.updateMany.mockResolvedValue({ count: 0 });
+
+      await authService.resetPassword({ token: 'valid', newPassword: 'new-password-1' } as never);
+
+      expect(prisma.refreshToken.updateMany).toHaveBeenCalledWith({
+        where: { userId: 'user-1', revokedAt: null },
+        data: { revokedAt: expect.any(Date) },
+      });
+    });
+
+    it('returns exactly {success: true}', async () => {
+      prisma.passwordResetToken.findUnique.mockResolvedValue(buildResetToken());
+      prisma.passwordResetToken.updateMany.mockResolvedValue({ count: 1 });
+      prisma.user.update.mockResolvedValue(buildUser());
+      prisma.refreshToken.updateMany.mockResolvedValue({ count: 0 });
+
+      const result = await authService.resetPassword({ token: 'valid', newPassword: 'new-password-1' } as never);
+
+      expect(result).toEqual({ success: true });
+    });
+  });
+
+  describe('me', () => {
+    it('returns the exact public user shape for the authenticated userId', async () => {
+      prisma.user.findUnique.mockResolvedValue(buildUser());
+
+      const result = await authService.me('user-1');
+
+      expect(prisma.user.findUnique).toHaveBeenCalledWith({ where: { id: 'user-1' } });
+      expect(result.user).not.toHaveProperty('passwordHash');
+      expect(result.user).not.toHaveProperty('deletedAt');
+      expect(result.user.id).toBe('user-1');
+    });
+
+    it('does not include an organization-context field (no server-side authority exists)', async () => {
+      prisma.user.findUnique.mockResolvedValue(buildUser());
+
+      const result = await authService.me('user-1');
+
+      expect(result).not.toHaveProperty('organization');
+      expect(result.user).not.toHaveProperty('organization');
+    });
+
+    it('throws INVALID_ACCESS_TOKEN if the user cannot be found (defensive path)', async () => {
+      prisma.user.findUnique.mockResolvedValue(null);
+
+      let error: ApiException | undefined;
+      try {
+        await authService.me('missing-user');
+      } catch (e) {
+        error = e as ApiException;
+      }
+
+      expect(error?.code).toBe(AUTH_ERROR_CODES.INVALID_ACCESS_TOKEN);
     });
   });
 });
