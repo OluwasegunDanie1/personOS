@@ -24,6 +24,7 @@ export interface EventSummary {
   venue: string | null;
   startDate: string;
   endDate: string | null;
+  cancelledAt: string | null;
   createdAt: string;
 }
 
@@ -50,6 +51,7 @@ interface EventRow {
   venue: string | null;
   startDate: Date;
   endDate: Date | null;
+  cancelledAt: Date | null;
   createdAt: Date;
 }
 
@@ -65,6 +67,7 @@ const EVENT_SELECT = {
   venue: true,
   startDate: true,
   endDate: true,
+  cancelledAt: true,
   createdAt: true,
 } as const;
 
@@ -244,6 +247,36 @@ export class EventsService {
     }
   }
 
+  /**
+   * Idempotent: cancellation authority (cancelledAt) is set exactly once. A
+   * repeat call on an already-cancelled Event performs no write and returns
+   * the original cancelledAt unchanged, mirroring the Attendance idempotent-
+   * replay convention. Never soft-deletes (deletedAt is untouched), never
+   * touches Attendance/Journey, and there is no restore/uncancel path.
+   */
+  async cancel(organizationId: string, eventId: string): Promise<{ event: EventDetail }> {
+    const existing = (await this.prisma.event.findFirst({
+      where: { id: eventId, organizationId, deletedAt: null },
+      select: EVENT_DETAIL_SELECT,
+    })) as EventDetailRow | null;
+
+    if (!existing) {
+      throw this.eventNotFoundError();
+    }
+
+    if (existing.cancelledAt) {
+      return { event: this.toDetail(existing) };
+    }
+
+    const updated = (await this.prisma.event.update({
+      where: { id: eventId },
+      data: { cancelledAt: new Date() },
+      select: EVENT_DETAIL_SELECT,
+    })) as EventDetailRow;
+
+    return { event: this.toDetail(updated) };
+  }
+
   private toSummary(row: EventRow): EventSummary {
     return {
       id: row.id,
@@ -253,6 +286,7 @@ export class EventsService {
       venue: row.venue,
       startDate: row.startDate.toISOString(),
       endDate: row.endDate ? row.endDate.toISOString() : null,
+      cancelledAt: row.cancelledAt ? row.cancelledAt.toISOString() : null,
       createdAt: row.createdAt.toISOString(),
     };
   }

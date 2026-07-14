@@ -322,6 +322,7 @@ model Event {
   startDate      DateTime  @map("start_date")
   endDate        DateTime? @map("end_date")
   createdBy      String    @map("created_by") @db.Uuid
+  cancelledAt    DateTime? @map("cancelled_at")
   deletedAt      DateTime? @map("deleted_at")
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")

@@ -946,9 +946,9 @@ Neither this document nor any Follow-Up endpoint defines a Delete Follow-Up oper
 
 Event Endpoints
 
-Events are organization-owned resources. All five Event endpoints below require the global access-token guard, OrganizationMembershipGuard membership validation, and a validated request.organization context.
+Events are organization-owned resources. All six Event endpoints below require the global access-token guard, OrganizationMembershipGuard membership validation, and a validated request.organization context.
 
-The approved Event schema has no status, cancelledAt, or lifecycle-state column, no EventCategory model, and no EventTemplate model. category is a single plain nullable string column directly on Event, not a separate manageable resource. Event Categories and Event Templates as listable/creatable/updatable/deletable resources are not approved v1 endpoints; they referenced schema models that do not exist and have been removed from this contract. There is no Cancel Event endpoint and no event status filter: Delete Event (below) is the sole approved v1 lifecycle-ending action, and it already preserves the event record through soft deletion.
+The approved Event schema has no generic status or lifecycle-state column, no EventCategory model, and no EventTemplate model. category is a single plain nullable string column directly on Event, not a separate manageable resource. Event Categories and Event Templates as listable/creatable/updatable/deletable resources are not approved v1 endpoints; they referenced schema models that do not exist and have been removed from this contract. The schema does have a single narrow `cancelledAt` (nullable instant) column (Product Task 059), set exactly once via the Cancel Event action below — this is the only lifecycle-state authority Event has; there is no separate writable status enum/column. Upcoming, Today, and Completed are never persisted: they remain entirely presentation-derived by the client from startDate/endDate/cancelledAt against the current instant, and this document defines no server-side filter or column for them.
 
 For any route containing eventId, service-level Event access must scope by both id = eventId and organizationId = validated organizationId, with deletedAt IS NULL. An absent, deleted, or cross-tenant Event returns the stable error EVENT_NOT_FOUND, without disclosing cross-tenant existence.
 
@@ -988,11 +988,14 @@ Success response data:
       "venue": "string | null",
       "startDate": "string",
       "endDate": "string | null",
+      "cancelledAt": "string | null",
       "createdAt": "string"
     }
   ],
   "nextCursor": "string | null"
 }
+
+A cancelled Event (cancelledAt non-null) remains fully visible in this list exactly like any other non-deleted Event — cancellation never hides or filters an Event, unlike deletedAt.
 
 Empty state (HTTP 200, standard success envelope): { "events": [], "nextCursor": null }.
 
@@ -1029,40 +1032,54 @@ Success response data (HTTP 201, standard success envelope):
     "venue": "string | null",
     "startDate": "string",
     "endDate": "string | null",
+    "cancelledAt": "string | null",
     "createdAt": "string",
     "createdBy": { "id": "string", "firstName": "string", "lastName": "string" }
   }
 }
 
+cancelledAt is always null on creation; Create Event does not accept a client-supplied cancelledAt (it is not a declared request field, and the global whitelist/forbidNonWhitelisted validation pipe rejects it as an unknown property, standard validation error).
+
 View Event
 GET /organizations/{organizationId}/events/{eventId}
 
-Success response data matches Create Event's shape. createdBy exposes only id, firstName, lastName — never email, phone, status, passwordHash, or deletedAt; historical attribution remains visible unchanged even if that User later becomes DISABLED or is soft-deleted. A deleted or cross-tenant Event returns EVENT_NOT_FOUND.
+Success response data matches Create Event's shape. createdBy exposes only id, firstName, lastName — never email, phone, status, passwordHash, or deletedAt; historical attribution remains visible unchanged even if that User later becomes DISABLED or is soft-deleted. A deleted or cross-tenant Event returns EVENT_NOT_FOUND. A cancelled Event (cancelledAt non-null) remains fully readable here — cancellation never produces EVENT_NOT_FOUND.
 
 Update Event
 PATCH /organizations/{organizationId}/events/{eventId}
 
 Mutable fields (no others accepted): title, description, category, venue, startDate, endDate — all optional, same normalization and validation as Create Event. Partial-update semantics: at least one approved mutable field must be supplied. An explicit null for description, category, venue, or endDate clears it; an empty normalized value also becomes null. title and startDate cannot be null or empty after trim. Date-range validation always uses the final combined values that would actually be persisted — the supplied field's new value merged with the other field's existing stored value when only one of startDate/endDate is supplied in the request — and rejects with INVALID_EVENT_DATE_RANGE when the resulting effective endDate would be earlier than the resulting effective startDate.
 
-Immutable through this endpoint: id, organizationId, createdBy, createdAt, updatedAt, deletedAt.
+Immutable through this endpoint: id, organizationId, createdBy, createdAt, updatedAt, deletedAt, cancelledAt. cancelledAt is not a declared Update Event field; supplying it is rejected as an unknown property (standard validation error), exactly like Create Event. Cancellation state can only be changed through the dedicated Cancel Event action below.
 
 Success response data matches Create Event's shape. A deleted or cross-tenant Event returns EVENT_NOT_FOUND.
 
 Delete Event
 DELETE /organizations/{organizationId}/events/{eventId}
 
-Event deletion is a soft deletion: deletedAt is set when the visible, organization-scoped Event exists. The Event row is never hard-deleted. Attendance records referencing this eventId are never deleted or rewritten by this operation; historical attendance remains preserved. This is the approved v1 equivalent of "cancelling" an event; there is no separate cancel action or status transition.
+Event deletion is a soft deletion: deletedAt is set when the visible, organization-scoped Event exists. The Event row is never hard-deleted. Attendance records referencing this eventId are never deleted or rewritten by this operation; historical attendance remains preserved. Delete is distinct from Cancel (below): a deleted Event is no longer visible anywhere and returns EVENT_NOT_FOUND on every subsequent read, while a cancelled Event remains fully visible in List/View Event with cancelledAt exposed. Deleting an Event does not require or imply it was first cancelled, and cancelling an Event does not soft-delete it.
 
 First successful deletion returns (standard success envelope): { "success": true }.
 
 A repeated delete sees the Event as non-visible and returns EVENT_NOT_FOUND, as does a cross-tenant Event.
 
+Cancel Event
+POST /organizations/{organizationId}/events/{eventId}/cancel
+
+Cancellation authority is the single nullable Event.cancelledAt instant column (Product Task 059) — there is no separate writable status field, and this action is the only way cancelledAt can ever be set. Service-level access scopes the target the same way every other eventId route does: id + organizationId + deletedAt IS NULL, else EVENT_NOT_FOUND (an already-soft-deleted Event cannot be cancelled, and cancelling never changes that visibility rule).
+
+Idempotent: if the Event's cancelledAt is already non-null, this action performs no write and returns the existing Event unchanged, with its original cancelledAt value — a repeat call never advances or resets the timestamp. Otherwise cancelledAt is set to the server clock at write time.
+
+This action never sets deletedAt (it is not a delete), never creates, updates, or deletes any Attendance row, and never touches Person Journey state. Success response data matches Create Event's shape (HTTP 200, standard success envelope), with cancelledAt reflecting the (now-set, or already-set) cancellation instant.
+
+There is no restore/uncancel endpoint or authority in v1: once cancelledAt is set, no approved action clears it back to null.
+
 Event-Domain Error Codes
 
-EVENT_NOT_FOUND: an absent, deleted, or cross-tenant Event for any eventId route.
+EVENT_NOT_FOUND: an absent, deleted, or cross-tenant Event for any eventId route (including Cancel Event).
 INVALID_EVENT_DATE_RANGE: a supplied endDate earlier than the applicable startDate.
 
-Neither this document nor any Event endpoint defines EVENT_CATEGORY_NOT_FOUND, EVENT_TEMPLATE_NOT_FOUND, or an event status/cancellation code; these are not approved v1 codes.
+Neither this document nor any Event endpoint defines EVENT_CATEGORY_NOT_FOUND, EVENT_TEMPLATE_NOT_FOUND, or a generic event status code; these are not approved v1 codes. Cancellation is represented solely by the cancelledAt instant described above, not by a status code or enum value.
 
 Attendance Endpoints
 
@@ -1370,7 +1387,7 @@ newPeople: count of People in the validated organization matching the same total
 
 pendingFollowUps: count of FollowUps in the validated organization whose status is PENDING or IN_PROGRESS. COMPLETED FollowUps are excluded. There is no overdue count and no reminder-state derivation.
 
-upcomingEvents: the next 5 non-deleted Events in the validated organization (deletedAt IS NULL) whose startDate is greater than or equal to the current server UTC instant, ordered by startDate ascending then id ascending (deterministic tie-break). There is no fixed future cutoff window beyond "the next 5"; there is no status/cancelled filtering, since Event has no such column. Each entry reuses the same minimal Event reference shape already approved for the Person Attendance history endpoint (id, title, startDate) — no new Event persistence field or Dashboard-specific Event shape is introduced.
+upcomingEvents: the next 5 non-deleted Events in the validated organization (deletedAt IS NULL) whose startDate is greater than or equal to the current server UTC instant, ordered by startDate ascending then id ascending (deterministic tie-break). There is no fixed future cutoff window beyond "the next 5"; this query does not filter on cancelledAt (Product Task 059), so a cancelled Event may still appear here — Dashboard Summary was not revisited by that task. Each entry reuses the same minimal Event reference shape already approved for the Person Attendance history endpoint (id, title, startDate) — no new Event persistence field or Dashboard-specific Event shape is introduced.
 
 recentMembers (Product Task 054): the 5 most recently created People in the validated organization matching the same scope as totalPeople/newPeople (deletedAt IS NULL, status = ACTIVE), ordered by createdAt descending then id ascending (deterministic tie-break). joinedAt reuses the exact same Person.createdAt mapping already established for PersonSummary.joinedAt elsewhere in this document — no new field or meaning is introduced. There is no avatar, membership-event, or activity-timeline data in this shape; this is a bounded People read, not a new domain.
 

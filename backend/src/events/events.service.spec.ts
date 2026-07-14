@@ -13,6 +13,7 @@ function buildEventRow(overrides: Partial<Record<string, unknown>> = {}) {
     venue: null,
     startDate: new Date('2026-08-02T09:00:00.000Z'),
     endDate: null,
+    cancelledAt: null,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
     createdByUser: { id: 'user-1', firstName: 'Ada', lastName: 'Lovelace' },
     ...overrides,
@@ -168,6 +169,19 @@ describe('EventsService', () => {
       expect(result).toEqual({ events: [], nextCursor: null });
     });
 
+    it('a cancelled (but not soft-deleted) Event remains readable in the list, with cancelledAt exposed', async () => {
+      prisma.event.findMany.mockResolvedValue([
+        buildEventRow({ cancelledAt: new Date('2026-07-14T10:00:00.000Z') }),
+      ]);
+
+      const result = await service.list(ORG_ID, {});
+
+      const args = prisma.event.findMany.mock.calls[0][0];
+      expect(args.where.deletedAt).toBeNull();
+      expect(args.where.cancelledAt).toBeUndefined();
+      expect(result.events[0].cancelledAt).toBe('2026-07-14T10:00:00.000Z');
+    });
+
     it('maps the exact approved list shape without organizationId/createdBy/deletedAt', async () => {
       prisma.event.findMany.mockResolvedValue([buildEventRow()]);
 
@@ -181,6 +195,7 @@ describe('EventsService', () => {
         venue: null,
         startDate: '2026-08-02T09:00:00.000Z',
         endDate: null,
+        cancelledAt: null,
         createdAt: '2026-01-01T00:00:00.000Z',
       });
       expect(result.events[0]).not.toHaveProperty('organizationId');
@@ -212,6 +227,16 @@ describe('EventsService', () => {
       expect(error?.code).toBe('EVENT_NOT_FOUND');
     });
 
+    it('a cancelled (but not soft-deleted) Event remains readable via detail, with cancelledAt exposed', async () => {
+      prisma.event.findFirst.mockResolvedValue(buildEventRow({ cancelledAt: new Date('2026-07-14T10:00:00.000Z') }));
+
+      const result = await service.detail(ORG_ID, 'event-1');
+
+      const args = prisma.event.findFirst.mock.calls[0][0];
+      expect(args.where).toEqual({ id: 'event-1', organizationId: ORG_ID, deletedAt: null });
+      expect(result.event.cancelledAt).toBe('2026-07-14T10:00:00.000Z');
+    });
+
     it('maps the exact approved detail shape including createdBy', async () => {
       prisma.event.findFirst.mockResolvedValue(buildEventRow());
 
@@ -226,6 +251,7 @@ describe('EventsService', () => {
           venue: null,
           startDate: '2026-08-02T09:00:00.000Z',
           endDate: null,
+          cancelledAt: null,
           createdAt: '2026-01-01T00:00:00.000Z',
           createdBy: { id: 'user-1', firstName: 'Ada', lastName: 'Lovelace' },
         },
@@ -330,6 +356,7 @@ describe('EventsService', () => {
           venue: null,
           startDate: '2026-08-02T09:00:00.000Z',
           endDate: null,
+          cancelledAt: null,
           createdAt: '2026-01-01T00:00:00.000Z',
           createdBy: { id: 'user-1', firstName: 'Ada', lastName: 'Lovelace' },
         },
@@ -453,6 +480,7 @@ describe('EventsService', () => {
       expect(args.data).not.toHaveProperty('createdBy');
       expect(args.data).not.toHaveProperty('createdAt');
       expect(args.data).not.toHaveProperty('deletedAt');
+      expect(args.data).not.toHaveProperty('cancelledAt');
     });
 
     it('returns the exact approved Event response shape', async () => {
@@ -511,6 +539,84 @@ describe('EventsService', () => {
       const result = await service.remove(ORG_ID, 'event-1');
 
       expect(result).toEqual({ success: true });
+    });
+  });
+
+  describe('cancel', () => {
+    it('scopes the target by id + organizationId + deletedAt null', async () => {
+      prisma.event.findFirst.mockResolvedValue(null);
+
+      await expect(service.cancel(ORG_ID, 'event-1')).rejects.toThrow();
+
+      const args = prisma.event.findFirst.mock.calls[0][0];
+      expect(args.where).toEqual({ id: 'event-1', organizationId: ORG_ID, deletedAt: null });
+    });
+
+    it('throws EVENT_NOT_FOUND when absent, cross-tenant, or soft-deleted', async () => {
+      prisma.event.findFirst.mockResolvedValue(null);
+
+      let error: ApiException | undefined;
+      try {
+        await service.cancel(ORG_ID, 'event-1');
+      } catch (e) {
+        error = e as ApiException;
+      }
+
+      expect(error?.code).toBe('EVENT_NOT_FOUND');
+      expect(prisma.event.update).not.toHaveBeenCalled();
+    });
+
+    it('sets cancelledAt (never deletedAt) on first cancel', async () => {
+      prisma.event.findFirst.mockResolvedValue(buildEventRow({ cancelledAt: null }));
+      prisma.event.update.mockResolvedValue(buildEventRow({ cancelledAt: new Date('2026-07-14T10:00:00.000Z') }));
+
+      const result = await service.cancel(ORG_ID, 'event-1');
+
+      const args = prisma.event.update.mock.calls[0][0];
+      expect(args.where).toEqual({ id: 'event-1' });
+      expect(args.data).toEqual({ cancelledAt: expect.any(Date) });
+      expect(result.event.cancelledAt).toBe('2026-07-14T10:00:00.000Z');
+    });
+
+    it('is idempotent: a repeat cancel performs no write and returns the original cancelledAt unchanged', async () => {
+      const alreadyCancelledAt = new Date('2026-07-10T08:00:00.000Z');
+      prisma.event.findFirst.mockResolvedValue(buildEventRow({ cancelledAt: alreadyCancelledAt }));
+
+      const result = await service.cancel(ORG_ID, 'event-1');
+
+      expect(prisma.event.update).not.toHaveBeenCalled();
+      expect(result.event.cancelledAt).toBe('2026-07-10T08:00:00.000Z');
+    });
+
+    it('returns the exact approved Event response shape including cancelledAt', async () => {
+      prisma.event.findFirst.mockResolvedValue(buildEventRow({ cancelledAt: null }));
+      prisma.event.update.mockResolvedValue(buildEventRow({ cancelledAt: new Date('2026-07-14T10:00:00.000Z') }));
+
+      const result = await service.cancel(ORG_ID, 'event-1');
+
+      expect(result).toEqual({
+        event: {
+          id: 'event-1',
+          title: 'Sunday Service',
+          description: null,
+          category: null,
+          venue: null,
+          startDate: '2026-08-02T09:00:00.000Z',
+          endDate: null,
+          cancelledAt: '2026-07-14T10:00:00.000Z',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          createdBy: { id: 'user-1', firstName: 'Ada', lastName: 'Lovelace' },
+        },
+      });
+    });
+
+    it('creates no Attendance or other side-effect record (only event.findFirst/event.update are touched)', async () => {
+      prisma.event.findFirst.mockResolvedValue(buildEventRow({ cancelledAt: null }));
+      prisma.event.update.mockResolvedValue(buildEventRow({ cancelledAt: new Date() }));
+
+      await service.cancel(ORG_ID, 'event-1');
+
+      expect(Object.keys(prisma)).toEqual(['event']);
     });
   });
 

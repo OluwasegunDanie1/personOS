@@ -134,6 +134,7 @@ describe('Events/Attendance route composition', () => {
       venue: null,
       startDate: new Date('2026-08-02T09:00:00.000Z'),
       endDate: null,
+      cancelledAt: null,
       createdAt: new Date('2026-01-01T00:00:00.000Z'),
       createdByUser: { id: 'user-1', firstName: 'Ada', lastName: 'Lovelace' },
       ...overrides,
@@ -203,6 +204,7 @@ describe('Events/Attendance route composition', () => {
         venue: null,
         startDate: '2026-08-02T09:00:00.000Z',
         endDate: null,
+        cancelledAt: null,
         createdAt: '2026-01-01T00:00:00.000Z',
         createdBy: { id: 'user-1', firstName: 'Ada', lastName: 'Lovelace' },
       },
@@ -237,6 +239,22 @@ describe('Events/Attendance route composition', () => {
       createdBy: 'attacker',
       organizationId: 'attacker',
     });
+
+    expect(status).toBe(400);
+  });
+
+  it('POST create rejects a client-supplied cancelledAt as an unknown field', async () => {
+    const { status } = await request('POST', eventsPath, validToken, {
+      title: 'Sunday Service',
+      startDate: '2026-08-02T09:00:00Z',
+      cancelledAt: '2026-08-02T09:00:00Z',
+    });
+
+    expect(status).toBe(400);
+  });
+
+  it('PATCH update rejects a client-supplied cancelledAt as an unknown field', async () => {
+    const { status } = await request('PATCH', eventPath, validToken, { cancelledAt: '2026-08-02T09:00:00Z' });
 
     expect(status).toBe(400);
   });
@@ -276,6 +294,97 @@ describe('Events/Attendance route composition', () => {
     const second = await request('DELETE', eventPath, validToken);
     expect(second.status).toBe(404);
     expect(second.json.error?.code).toBe('EVENT_NOT_FOUND');
+  });
+
+  it('rejects a missing access token on the cancel route with AUTHENTICATION_REQUIRED', async () => {
+    const { status, json } = await request('POST', `${eventPath}/cancel`);
+
+    expect(status).toBe(401);
+    expect(json.error?.code).toBe('AUTHENTICATION_REQUIRED');
+  });
+
+  it('rejects a cancel request with no organization membership using ORGANIZATION_ACCESS_DENIED', async () => {
+    prisma.organizationMembership.findUnique.mockResolvedValue(null);
+    prisma.event.findFirst.mockResolvedValue(eventRow());
+
+    const { status, json } = await request('POST', `${eventPath}/cancel`, validToken);
+
+    expect(status).toBe(403);
+    expect(json.error?.code).toBe('ORGANIZATION_ACCESS_DENIED');
+  });
+
+  it('POST cancel returns EVENT_NOT_FOUND for a cross-tenant/absent/soft-deleted Event', async () => {
+    prisma.event.findFirst.mockResolvedValue(null);
+
+    const { status, json } = await request('POST', `${eventPath}/cancel`, validToken);
+
+    expect(status).toBe(404);
+    expect(json.error?.code).toBe('EVENT_NOT_FOUND');
+  });
+
+  it('POST cancel sets cancelledAt and exposes it in the response, then is idempotent on replay', async () => {
+    prisma.event.findFirst.mockResolvedValueOnce(eventRow({ cancelledAt: null }));
+    prisma.event.update.mockResolvedValueOnce(eventRow({ cancelledAt: new Date('2026-07-14T10:00:00.000Z') }));
+
+    const first = await request('POST', `${eventPath}/cancel`, validToken);
+
+    expect(first.status).toBe(200);
+    expect((first.json.data as { event: { cancelledAt: string | null } }).event.cancelledAt).toBe(
+      '2026-07-14T10:00:00.000Z',
+    );
+
+    const updateCallsBefore = prisma.event.update.mock.calls.length;
+    prisma.event.findFirst.mockResolvedValueOnce(
+      eventRow({ cancelledAt: new Date('2026-07-14T10:00:00.000Z') }),
+    );
+
+    const second = await request('POST', `${eventPath}/cancel`, validToken);
+
+    expect(second.status).toBe(200);
+    expect((second.json.data as { event: { cancelledAt: string | null } }).event.cancelledAt).toBe(
+      '2026-07-14T10:00:00.000Z',
+    );
+    expect(prisma.event.update.mock.calls.length).toBe(updateCallsBefore);
+  });
+
+  it('a cancelled Event remains readable via GET list and GET detail (never excluded like a soft-delete)', async () => {
+    prisma.event.findMany.mockResolvedValue([eventRow({ cancelledAt: new Date('2026-07-14T10:00:00.000Z') })]);
+    prisma.event.findFirst.mockResolvedValue(eventRow({ cancelledAt: new Date('2026-07-14T10:00:00.000Z') }));
+
+    const list = await request('GET', eventsPath, validToken);
+    expect(list.status).toBe(200);
+    const events = (list.json.data as { events: Array<{ cancelledAt: string | null }> }).events;
+    expect(events[0].cancelledAt).toBe('2026-07-14T10:00:00.000Z');
+
+    const detail = await request('GET', eventPath, validToken);
+    expect(detail.status).toBe(200);
+    expect((detail.json.data as { event: { cancelledAt: string | null } }).event.cancelledAt).toBe(
+      '2026-07-14T10:00:00.000Z',
+    );
+  });
+
+  it('a soft-deleted Event remains excluded exactly as before (cancel does not change delete visibility rules)', async () => {
+    prisma.event.findFirst.mockResolvedValue(null);
+
+    const detail = await request('GET', eventPath, validToken);
+    expect(detail.status).toBe(404);
+    expect(detail.json.error?.code).toBe('EVENT_NOT_FOUND');
+
+    const cancel = await request('POST', `${eventPath}/cancel`, validToken);
+    expect(cancel.status).toBe(404);
+    expect(cancel.json.error?.code).toBe('EVENT_NOT_FOUND');
+  });
+
+  it('cancel never touches Attendance (no attendance.* Prisma call is made)', async () => {
+    prisma.event.findFirst.mockResolvedValue(eventRow({ cancelledAt: null }));
+    prisma.event.update.mockResolvedValue(eventRow({ cancelledAt: new Date() }));
+
+    await request('POST', `${eventPath}/cancel`, validToken);
+
+    expect(prisma.attendance.findMany).not.toHaveBeenCalled();
+    expect(prisma.attendance.create).not.toHaveBeenCalled();
+    expect(prisma.attendance.findUnique).not.toHaveBeenCalled();
+    expect(prisma.attendance.count).not.toHaveBeenCalled();
   });
 
   it('GET event attendance list returns the empty shape and rejects an unknown query param', async () => {

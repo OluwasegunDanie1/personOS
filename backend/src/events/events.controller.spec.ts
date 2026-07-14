@@ -23,6 +23,7 @@ describe('EventsController', () => {
     detail: jest.Mock;
     update: jest.Mock;
     remove: jest.Mock;
+    cancel: jest.Mock;
   };
   let controller: EventsController;
 
@@ -33,6 +34,7 @@ describe('EventsController', () => {
       detail: jest.fn().mockResolvedValue({ event: {} }),
       update: jest.fn().mockResolvedValue({ event: {} }),
       remove: jest.fn().mockResolvedValue({ success: true }),
+      cancel: jest.fn().mockResolvedValue({ event: {} }),
     };
     controller = new EventsController(service as unknown as EventsService);
   });
@@ -86,5 +88,13 @@ describe('EventsController', () => {
     await controller.remove(request, 'event-1');
 
     expect(service.remove).toHaveBeenCalledWith(ORG_ID, 'event-1');
+  });
+
+  it('cancel() delegates using the validated organization context', async () => {
+    const request = buildRequest();
+
+    await controller.cancel(request, 'event-1');
+
+    expect(service.cancel).toHaveBeenCalledWith(ORG_ID, 'event-1');
   });
 });

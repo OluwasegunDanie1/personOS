@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { OrganizationMembershipGuard } from '../common/guards/organization-membership.guard';
 import { AuthenticatedRequest } from '../common/http/request-context';
 import { CreateEventDto } from './dto/create-event.dto';
@@ -35,5 +35,11 @@ export class EventsController {
   @Delete(':eventId')
   remove(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string) {
     return this.eventsService.remove(request.organization!.organizationId, eventId);
+  }
+
+  @Post(':eventId/cancel')
+  @HttpCode(HttpStatus.OK)
+  cancel(@Req() request: AuthenticatedRequest, @Param('eventId') eventId: string) {
+    return this.eventsService.cancel(request.organization!.organizationId, eventId);
   }
 }
