@@ -8,6 +8,7 @@ import '../../features/dashboard/home_screen.dart';
 import '../../features/events/create_event_screen.dart';
 import '../../features/events/edit_event_screen.dart';
 import '../../features/events/event_attendance_screen.dart';
+import '../../features/events/event_check_in_screen.dart';
 import '../../features/events/event_detail_screen.dart';
 import '../../features/events/events_screen.dart';
 import '../../features/messages/messages_screen.dart';
@@ -142,6 +143,12 @@ final goRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/events/:eventId/attendance',
         builder: (context, state) => EventAttendanceScreen(eventId: state.pathParameters['eventId']!),
+      ),
+      // Pushed above the shell (Product Task 069) — real Check-In flow
+      // using the existing POST .../attendance endpoint.
+      GoRoute(
+        path: '/events/:eventId/check-in',
+        builder: (context, state) => EventCheckInScreen(eventId: state.pathParameters['eventId']!),
       ),
       // Pushed above the shell (Product Task 066) — no route parameters,
       // reached from Home's bell icon, mirroring '/workspace/members'

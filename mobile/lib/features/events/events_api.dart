@@ -135,4 +135,40 @@ class EventsApi {
     final data = unwrapEnvelope(response) as Map<String, dynamic>;
     return EventAttendanceListResult.fromJson(data);
   }
+
+  /// Integrates the real, implemented POST
+  /// /organizations/:organizationId/events/:eventId/attendance endpoint
+  /// (Product Task 069). Always records the backend's own default status
+  /// (PRESENT) — no status picker is sent, since only a single truthful
+  /// check-in action is implemented. Idempotent on the backend: a repeat
+  /// call for the same personId returns the original Attendance row
+  /// unchanged (HTTP 200) instead of creating a duplicate (HTTP 201 on
+  /// first write) — [CheckInResult.created] reflects which one actually
+  /// happened, from the real HTTP status code, never guessed from the body.
+  Future<CheckInResult> recordAttendance({
+    required String organizationId,
+    required String eventId,
+    required String personId,
+  }) async {
+    final response = await _dio.post<dynamic>(
+      '/organizations/$organizationId/events/$eventId/attendance',
+      data: {'personId': personId},
+    );
+    final data = unwrapEnvelope(response) as Map<String, dynamic>;
+    return CheckInResult(
+      attendance: EventAttendanceRecord.fromJson(data['attendance'] as Map<String, dynamic>),
+      created: response.statusCode == 201,
+    );
+  }
+}
+
+class CheckInResult {
+  const CheckInResult({required this.attendance, required this.created});
+
+  final EventAttendanceRecord attendance;
+
+  /// True on a fresh first-time check-in (HTTP 201); false when the backend
+  /// recognized this as an idempotent replay of an already-existing
+  /// Attendance row (HTTP 200) and returned it unchanged.
+  final bool created;
 }

@@ -8,15 +8,16 @@ import 'event_models.dart';
 import 'events_provider.dart';
 
 /// Matches design/ui-reference/9.png's Event Detail composition, narrowed to
-/// Product Task 061's locked truthful scope: title, local date/time, venue,
-/// description, createdBy, a presentation-derived lifecycle badge, Edit,
-/// and an Attendance action that opens the real read-only Attendance list.
-/// Omitted (no backend authority): cover image, the Expected/Checked-
-/// in/Pending/Guest stat grid, Attendance Summary ring, Registered People,
-/// Announcements, Notes, Recent Activity, Start Check-In. Share is also
+/// Product Task 061/069's locked truthful scope: title, local date/time,
+/// venue, description, createdBy, a presentation-derived lifecycle badge,
+/// Edit, an Attendance action that opens the real read-only Attendance
+/// list, and a Check In action that opens the real Event Check-In flow
+/// (Product Task 069). Omitted (no backend authority): cover image, the
+/// Expected/Checked-in/Pending/Guest stat grid, Attendance Summary ring,
+/// Registered People, Announcements, Notes, Recent Activity. Share is also
 /// omitted — device-native share would require adding a new dependency
 /// (e.g. share_plus), which is not an existing convention in this codebase
-/// and is out of this task's narrow scope (see completion report).
+/// and is out of scope.
 class EventDetailScreen extends ConsumerWidget {
   const EventDetailScreen({super.key, required this.eventId});
 
@@ -145,6 +146,11 @@ class _DetailBody extends StatelessWidget {
                 onTap: () => context.push('/events/$eventId/edit'),
               ),
               _ActionItem(
+                icon: Icons.how_to_reg_outlined,
+                label: 'Check In',
+                onTap: () => context.push('/events/$eventId/check-in'),
+              ),
+              _ActionItem(
                 icon: Icons.people_alt_outlined,
                 label: 'Attendance',
                 onTap: () => context.push('/events/$eventId/attendance'),
@@ -169,6 +175,19 @@ class _DetailBody extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: FilledButton(
+              onPressed: () => context.push('/events/$eventId/check-in'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.brandPrimary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('Start Check-In', style: TextStyle(fontWeight: FontWeight.w700)),
+            ),
+          ),
+          const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
             height: 52,

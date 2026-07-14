@@ -71,6 +71,10 @@ Future<GoRouter> _pumpEventDetailScreen(WidgetTester tester, {required _DetailHa
         path: '/events/:eventId/attendance',
         builder: (context, state) => Scaffold(body: Text('Attendance ${state.pathParameters['eventId']}')),
       ),
+      GoRoute(
+        path: '/events/:eventId/check-in',
+        builder: (context, state) => Scaffold(body: Text('Check-In ${state.pathParameters['eventId']}')),
+      ),
     ],
   );
 
@@ -103,7 +107,7 @@ void main() {
     expect(find.text('Ada Lovelace'), findsOneWidget);
   });
 
-  testWidgets('unsupported sections are absent: stats grid, Attendance Summary, Registered People, Announcements, Notes, Recent Activity, Start Check-In', (
+  testWidgets('unsupported sections are absent: stats grid, Attendance Summary, Registered People, Announcements, Notes, Recent Activity', (
     WidgetTester tester,
   ) async {
     await _pumpEventDetailScreen(tester, detailHandler: (eventId) async => _detail());
@@ -117,7 +121,6 @@ void main() {
     expect(find.text('Announcements'), findsNothing);
     expect(find.text('Notes'), findsNothing);
     expect(find.text('Recent Activity'), findsNothing);
-    expect(find.text('Start Check-In'), findsNothing);
     expect(find.text('Share'), findsNothing);
   });
 
@@ -128,6 +131,26 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(router.state.uri.toString(), '/events/event-1/edit');
+  });
+
+  testWidgets('Check In navigates to the real Event Check-In route', (WidgetTester tester) async {
+    final router = await _pumpEventDetailScreen(tester, detailHandler: (eventId) async => _detail());
+
+    await tester.tap(find.text('Check In'));
+    await tester.pumpAndSettle();
+
+    expect(router.state.uri.toString(), '/events/event-1/check-in');
+  });
+
+  testWidgets('Start Check-In (primary button) navigates to the real Event Check-In route', (
+    WidgetTester tester,
+  ) async {
+    final router = await _pumpEventDetailScreen(tester, detailHandler: (eventId) async => _detail());
+
+    await tester.tap(find.text('Start Check-In'));
+    await tester.pumpAndSettle();
+
+    expect(router.state.uri.toString(), '/events/event-1/check-in');
   });
 
   testWidgets('Attendance navigates to the real read-only Attendance list route', (WidgetTester tester) async {
