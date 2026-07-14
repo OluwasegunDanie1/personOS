@@ -4,8 +4,8 @@ const ORG_ID = '11111111-1111-1111-1111-111111111111';
 
 function createMockPrisma() {
   return {
-    person: { count: jest.fn() },
-    followUp: { count: jest.fn() },
+    person: { count: jest.fn(), findMany: jest.fn() },
+    followUp: { count: jest.fn(), findMany: jest.fn() },
     event: { findMany: jest.fn() },
   };
 }
@@ -17,7 +17,9 @@ describe('DashboardService', () => {
   beforeEach(() => {
     prisma = createMockPrisma();
     prisma.person.count.mockResolvedValue(0);
+    prisma.person.findMany.mockResolvedValue([]);
     prisma.followUp.count.mockResolvedValue(0);
+    prisma.followUp.findMany.mockResolvedValue([]);
     prisma.event.findMany.mockResolvedValue([]);
     service = new DashboardService(prisma as never);
 
@@ -167,8 +169,132 @@ describe('DashboardService', () => {
     });
   });
 
+  describe('recentMembers (Product Task 054)', () => {
+    it('is scoped by organizationId, deletedAt null, and status ACTIVE — same scope as totalPeople/newPeople', async () => {
+      await service.summary(ORG_ID);
+
+      const args = prisma.person.findMany.mock.calls[0][0];
+      expect(args.where).toEqual({ organizationId: ORG_ID, deletedAt: null, status: 'ACTIVE' });
+    });
+
+    it('orders by createdAt descending then id ascending (most recently joined first)', async () => {
+      await service.summary(ORG_ID);
+
+      const args = prisma.person.findMany.mock.calls[0][0];
+      expect(args.orderBy).toEqual([{ createdAt: 'desc' }, { id: 'asc' }]);
+    });
+
+    it('takes exactly 5', async () => {
+      await service.summary(ORG_ID);
+
+      const args = prisma.person.findMany.mock.calls[0][0];
+      expect(args.take).toBe(5);
+    });
+
+    it('selects exactly id, firstName, lastName, createdAt', async () => {
+      await service.summary(ORG_ID);
+
+      const args = prisma.person.findMany.mock.calls[0][0];
+      expect(args.select).toEqual({ id: true, firstName: true, lastName: true, createdAt: true });
+    });
+
+    it('maps rows to {id, firstName, lastName, joinedAt} with an ISO string joinedAt', async () => {
+      prisma.person.findMany.mockResolvedValue([
+        { id: 'person-1', firstName: 'Ada', lastName: 'Lovelace', createdAt: new Date('2026-07-10T09:00:00.000Z') },
+      ]);
+
+      const result = await service.summary(ORG_ID);
+
+      expect(result.recentMembers).toEqual([
+        { id: 'person-1', firstName: 'Ada', lastName: 'Lovelace', joinedAt: '2026-07-10T09:00:00.000Z' },
+      ]);
+    });
+
+    it('returns an empty array when there are no members', async () => {
+      const result = await service.summary(ORG_ID);
+
+      expect(result.recentMembers).toEqual([]);
+    });
+  });
+
+  describe('pendingTasks (Product Task 054)', () => {
+    it('is scoped by organizationId and status IN [PENDING, IN_PROGRESS] — same scope as pendingFollowUps', async () => {
+      await service.summary(ORG_ID);
+
+      const args = prisma.followUp.findMany.mock.calls[0][0];
+      expect(args.where).toEqual({ organizationId: ORG_ID, status: { in: ['PENDING', 'IN_PROGRESS'] } });
+    });
+
+    it('never includes COMPLETED Follow-Ups (no completion percentage or status invention)', async () => {
+      await service.summary(ORG_ID);
+
+      const args = prisma.followUp.findMany.mock.calls[0][0];
+      expect(args.where.status.in).not.toContain('COMPLETED');
+    });
+
+    it('orders by dueDate ascending with nulls last, then id ascending — matching the approved dueDate_asc List Follow-Ups sort', async () => {
+      await service.summary(ORG_ID);
+
+      const args = prisma.followUp.findMany.mock.calls[0][0];
+      expect(args.orderBy).toEqual([{ dueDate: { sort: 'asc', nulls: 'last' } }, { id: 'asc' }]);
+    });
+
+    it('takes exactly 5', async () => {
+      await service.summary(ORG_ID);
+
+      const args = prisma.followUp.findMany.mock.calls[0][0];
+      expect(args.take).toBe(5);
+    });
+
+    it('selects exactly id, title, description, dueDate', async () => {
+      await service.summary(ORG_ID);
+
+      const args = prisma.followUp.findMany.mock.calls[0][0];
+      expect(args.select).toEqual({ id: true, title: true, description: true, dueDate: true });
+    });
+
+    it('maps a row with a real dueDate to an ISO string dueDate', async () => {
+      prisma.followUp.findMany.mockResolvedValue([
+        {
+          id: 'fu-1',
+          title: 'Follow up with Alex Smith',
+          description: 'Member follow-up',
+          dueDate: new Date('2026-07-12T09:00:00.000Z'),
+        },
+      ]);
+
+      const result = await service.summary(ORG_ID);
+
+      expect(result.pendingTasks).toEqual([
+        {
+          id: 'fu-1',
+          title: 'Follow up with Alex Smith',
+          description: 'Member follow-up',
+          dueDate: '2026-07-12T09:00:00.000Z',
+        },
+      ]);
+    });
+
+    it('preserves a null dueDate and a null description, never fabricating either', async () => {
+      prisma.followUp.findMany.mockResolvedValue([
+        { id: 'fu-1', title: 'Untitled task', description: null, dueDate: null },
+      ]);
+
+      const result = await service.summary(ORG_ID);
+
+      expect(result.pendingTasks[0].dueDate).toBeNull();
+      expect(result.pendingTasks[0].description).toBeNull();
+    });
+
+    it('returns an empty array when there are no pending tasks', async () => {
+      const result = await service.summary(ORG_ID);
+
+      expect(result.pendingTasks).toEqual([]);
+    });
+  });
+
   describe('response shape', () => {
-    it('returns exactly totalPeople/newPeople/pendingFollowUps/upcomingEvents on zero/empty results', async () => {
+    it('returns exactly the six approved fields on zero/empty results', async () => {
       const result = await service.summary(ORG_ID);
 
       expect(result).toEqual({
@@ -176,6 +302,8 @@ describe('DashboardService', () => {
         newPeople: 0,
         pendingFollowUps: 0,
         upcomingEvents: [],
+        recentMembers: [],
+        pendingTasks: [],
       });
     });
 
@@ -191,6 +319,9 @@ describe('DashboardService', () => {
       expect(result).not.toHaveProperty('growth');
       expect(result).not.toHaveProperty('trend');
       expect(result).not.toHaveProperty('generatedAt');
+      expect(result).not.toHaveProperty('completionPercentage');
+      expect(result).not.toHaveProperty('priority');
+      expect(result).not.toHaveProperty('taskCategory');
     });
   });
 

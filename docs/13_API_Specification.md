@@ -1355,6 +1355,12 @@ Success response data:
   "pendingFollowUps": 0,
   "upcomingEvents": [
     { "id": "string", "title": "string", "startDate": "string" }
+  ],
+  "recentMembers": [
+    { "id": "string", "firstName": "string", "lastName": "string", "joinedAt": "string" }
+  ],
+  "pendingTasks": [
+    { "id": "string", "title": "string", "description": "string | null", "dueDate": "string | null" }
   ]
 }
 
@@ -1365,6 +1371,10 @@ newPeople: count of People in the validated organization matching the same total
 pendingFollowUps: count of FollowUps in the validated organization whose status is PENDING or IN_PROGRESS. COMPLETED FollowUps are excluded. There is no overdue count and no reminder-state derivation.
 
 upcomingEvents: the next 5 non-deleted Events in the validated organization (deletedAt IS NULL) whose startDate is greater than or equal to the current server UTC instant, ordered by startDate ascending then id ascending (deterministic tie-break). There is no fixed future cutoff window beyond "the next 5"; there is no status/cancelled filtering, since Event has no such column. Each entry reuses the same minimal Event reference shape already approved for the Person Attendance history endpoint (id, title, startDate) — no new Event persistence field or Dashboard-specific Event shape is introduced.
+
+recentMembers (Product Task 054): the 5 most recently created People in the validated organization matching the same scope as totalPeople/newPeople (deletedAt IS NULL, status = ACTIVE), ordered by createdAt descending then id ascending (deterministic tie-break). joinedAt reuses the exact same Person.createdAt mapping already established for PersonSummary.joinedAt elsewhere in this document — no new field or meaning is introduced. There is no avatar, membership-event, or activity-timeline data in this shape; this is a bounded People read, not a new domain.
+
+pendingTasks (Product Task 054): the 5 FollowUps in the validated organization matching the same scope as pendingFollowUps (status PENDING or IN_PROGRESS), ordered by dueDate ascending with nulls last, then id ascending — identical to the approved dueDate_asc List Follow-Ups sort. Each entry reuses the exact existing FollowUp id/title/description/dueDate fields already approved for List/Create Follow-Up; dueDate remains the existing absolute-instant-or-null contract, never re-derived or defaulted. This is not a new Task domain: no priority, category, assignee, completion-percentage, or generic-task field is introduced. pendingTasks and pendingFollowUps read the same underlying FollowUp scope; pendingTasks is simply the bounded, ordered item list where pendingFollowUps remains the plain count.
 
 Not approved for v1 Dashboard Summary, and therefore never present in the response: attendanceRate, attendancePercentage (no approved denominator exists — Attendance has no expected-attendee, roster, RSVP, or capacity concept), todayAttendance (no Approved-status document establishes this requirement; it appears only in Draft/Atlas-era material, which is not authority), recentActivity (no persisted Timeline/Activity model exists), journeyStageDistribution (Journey history is immutable and per-transition; it is never aggregated as a current-stage snapshot), growth, trend, comparison percentages, overdueFollowUps, or any report metadata.
 

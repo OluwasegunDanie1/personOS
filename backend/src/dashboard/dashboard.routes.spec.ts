@@ -27,8 +27,8 @@ describe('Dashboard route composition', () => {
   let prisma: {
     user: { findUnique: jest.Mock };
     organizationMembership: { findUnique: jest.Mock };
-    person: { count: jest.Mock };
-    followUp: { count: jest.Mock };
+    person: { count: jest.Mock; findMany: jest.Mock };
+    followUp: { count: jest.Mock; findMany: jest.Mock };
     event: { findMany: jest.Mock };
   };
   let validToken: string;
@@ -40,8 +40,8 @@ describe('Dashboard route composition', () => {
     prisma = {
       user: { findUnique: jest.fn() },
       organizationMembership: { findUnique: jest.fn() },
-      person: { count: jest.fn() },
-      followUp: { count: jest.fn() },
+      person: { count: jest.fn(), findMany: jest.fn() },
+      followUp: { count: jest.fn(), findMany: jest.fn() },
       event: { findMany: jest.fn() },
     };
 
@@ -87,7 +87,9 @@ describe('Dashboard route composition', () => {
       roleId: 'role-1',
     });
     prisma.person.count.mockResolvedValue(0);
+    prisma.person.findMany.mockResolvedValue([]);
     prisma.followUp.count.mockResolvedValue(0);
+    prisma.followUp.findMany.mockResolvedValue([]);
     prisma.event.findMany.mockResolvedValue([]);
   });
 
@@ -133,12 +135,19 @@ describe('Dashboard route composition', () => {
     expect(status).toBe(200);
   });
 
-  it('returns the standard envelope with exactly the four approved fields on empty/zero data', async () => {
+  it('returns the standard envelope with exactly the six approved fields on empty/zero data', async () => {
     const { status, json } = await request('GET', dashboardPath, validToken);
 
     expect(status).toBe(200);
     expect(json.success).toBe(true);
-    expect(json.data).toEqual({ totalPeople: 0, newPeople: 0, pendingFollowUps: 0, upcomingEvents: [] });
+    expect(json.data).toEqual({
+      totalPeople: 0,
+      newPeople: 0,
+      pendingFollowUps: 0,
+      upcomingEvents: [],
+      recentMembers: [],
+      pendingTasks: [],
+    });
   });
 
   it('never includes disallowed fields in the live response', async () => {
@@ -147,15 +156,35 @@ describe('Dashboard route composition', () => {
     prisma.event.findMany.mockResolvedValue([
       { id: 'event-1', title: 'Sunday Service', startDate: new Date('2026-08-02T09:00:00.000Z') },
     ]);
+    prisma.person.findMany.mockResolvedValue([
+      { id: 'person-1', firstName: 'Ada', lastName: 'Lovelace', createdAt: new Date('2026-07-10T09:00:00.000Z') },
+    ]);
+    prisma.followUp.findMany.mockResolvedValue([
+      { id: 'fu-1', title: 'Follow up with Alex Smith', description: null, dueDate: null },
+    ]);
 
     const { json } = await request('GET', dashboardPath, validToken);
 
     const data = json.data as Record<string, unknown>;
-    expect(Object.keys(data).sort()).toEqual(['newPeople', 'pendingFollowUps', 'totalPeople', 'upcomingEvents'].sort());
+    expect(Object.keys(data).sort()).toEqual(
+      ['newPeople', 'pendingFollowUps', 'totalPeople', 'upcomingEvents', 'recentMembers', 'pendingTasks'].sort(),
+    );
     expect((data.upcomingEvents as Array<Record<string, unknown>>)[0]).toEqual({
       id: 'event-1',
       title: 'Sunday Service',
       startDate: '2026-08-02T09:00:00.000Z',
+    });
+    expect((data.recentMembers as Array<Record<string, unknown>>)[0]).toEqual({
+      id: 'person-1',
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+      joinedAt: '2026-07-10T09:00:00.000Z',
+    });
+    expect((data.pendingTasks as Array<Record<string, unknown>>)[0]).toEqual({
+      id: 'fu-1',
+      title: 'Follow up with Alex Smith',
+      description: null,
+      dueDate: null,
     });
   });
 
