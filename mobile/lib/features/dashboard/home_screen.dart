@@ -90,9 +90,22 @@ class _DashboardBody extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        Text(
-          '$greeting${firstName != null ? ', $firstName.' : '.'}',
-          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text(
+                '$greeting${firstName != null ? ', $firstName.' : '.'}',
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+              ),
+            ),
+            IconButton(
+              key: const Key('homeNotificationsBellButton'),
+              onPressed: () => context.push('/notifications'),
+              icon: const Icon(Icons.notifications_none, color: AppColors.textPrimary),
+              tooltip: 'Notifications',
+            ),
+          ],
         ),
         if (organizationName != null) ...[
           const SizedBox(height: 4),
@@ -246,6 +259,7 @@ class _QuickActionTile extends StatelessWidget {
       color: AppColors.surfaceCard,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
+        key: const Key('homeQuickActionTileInkWell'),
         borderRadius: BorderRadius.circular(14),
         onTap: onTap,
         child: Container(

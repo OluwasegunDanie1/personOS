@@ -11,6 +11,7 @@ import '../../features/events/event_attendance_screen.dart';
 import '../../features/events/event_detail_screen.dart';
 import '../../features/events/events_screen.dart';
 import '../../features/messages/messages_screen.dart';
+import '../../features/notifications/notifications_screen.dart';
 import '../../features/organizations/organization_context_controller.dart';
 import '../../features/organizations/organization_setup_screen.dart';
 import '../../features/people/add_person_screen.dart';
@@ -142,6 +143,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         path: '/events/:eventId/attendance',
         builder: (context, state) => EventAttendanceScreen(eventId: state.pathParameters['eventId']!),
       ),
+      // Pushed above the shell (Product Task 066) — no route parameters,
+      // reached from Home's bell icon, mirroring '/workspace/members'
+      // exactly (uses only the already-selected organization context).
+      GoRoute(path: '/notifications', builder: (context, state) => const NotificationsScreen()),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) => PrimaryNavigationShell(navigationShell: navigationShell),
         branches: [

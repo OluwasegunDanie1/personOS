@@ -162,6 +162,10 @@ Future<_RouterHarness> _pumpHomeWithRouter(
         path: '/people/add',
         builder: (context, state) => const Scaffold(body: Text('Add Person destination')),
       ),
+      GoRoute(
+        path: '/notifications',
+        builder: (context, state) => const Scaffold(body: Text('Notifications destination')),
+      ),
     ],
   );
 
@@ -320,12 +324,22 @@ void main() {
     expect(find.text('Add Person destination'), findsOneWidget);
   });
 
+  testWidgets('tapping the bell icon navigates to the real /notifications route', (WidgetTester tester) async {
+    final harness = await _pumpHomeWithRouter(tester, handler: (organizationId) async => _summary());
+
+    await tester.tap(find.byKey(const Key('homeNotificationsBellButton')));
+    await tester.pumpAndSettle();
+
+    expect(harness.router.state.uri.toString(), '/notifications');
+    expect(find.text('Notifications destination'), findsOneWidget);
+  });
+
   testWidgets('no fake/dead Quick Action control exists: the only rendered action is interactive', (
     WidgetTester tester,
   ) async {
     await _pumpHome(tester, handler: (organizationId) async => _summary());
 
-    final inkWell = tester.widget<InkWell>(find.byType(InkWell));
+    final inkWell = tester.widget<InkWell>(find.byKey(const Key('homeQuickActionTileInkWell')));
     expect(inkWell.onTap, isNotNull);
   });
 
