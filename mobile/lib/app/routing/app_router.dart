@@ -16,7 +16,10 @@ import '../../features/events/event_detail_screen.dart';
 import '../../features/events/events_screen.dart';
 import '../../features/messages/messages_screen.dart';
 import '../../features/notifications/notifications_screen.dart';
+import '../../features/onboarding/onboarding_screen.dart';
+import '../../features/onboarding/welcome_screen.dart';
 import '../../features/organizations/organization_context_controller.dart';
+import '../../features/organizations/organization_ready_screen.dart';
 import '../../features/organizations/organization_setup_screen.dart';
 import '../../features/people/add_person_screen.dart';
 import '../../features/people/create_follow_up_screen.dart';
@@ -30,17 +33,28 @@ import '../splash_screen.dart';
 import 'primary_navigation_shell.dart';
 
 const splashPath = '/splash';
+const welcomePath = '/welcome';
+const onboardingPath = '/onboarding';
 const signInPath = '/sign-in';
 const createAccountPath = '/create-account';
 const forgotPasswordPath = '/forgot-password';
 const resetPasswordPath = '/reset-password';
 const organizationSetupPath = '/organization-setup';
+const organizationReadyPath = '/organization-ready';
 const shellPaths = ['/home', '/people', '/events', '/messages', '/workspace'];
 
 /// Pre-authentication paths reachable while unauthenticated (Product Task
-/// 074): Sign In plus the real Create Account / Forgot Password / Reset
-/// Password flows. None of these requires an existing session.
-const _preAuthPaths = [signInPath, createAccountPath, forgotPasswordPath, resetPasswordPath];
+/// 074/077): the onboarding carousel, Welcome, Sign In, and the real Create
+/// Account / Forgot Password / Reset Password flows. None of these requires
+/// an existing session.
+const _preAuthPaths = [
+  onboardingPath,
+  welcomePath,
+  signInPath,
+  createAccountPath,
+  forgotPasswordPath,
+  resetPasswordPath,
+];
 
 /// Notifies GoRouter to re-evaluate [resolveRedirect] whenever auth or
 /// organization-context state changes.
@@ -64,7 +78,10 @@ String? resolveRedirect({
   }
 
   if (authState.status == AuthStatus.unauthenticated) {
-    return _preAuthPaths.contains(location) ? null : signInPath;
+    // The onboarding carousel is the pre-auth entry point (Product Task
+    // 077): there is no persisted "has seen onboarding" flag, so every
+    // unauthenticated session starts there.
+    return _preAuthPaths.contains(location) ? null : onboardingPath;
   }
 
   final isAtEntryPoint = location == splashPath || _preAuthPaths.contains(location);
@@ -79,7 +96,12 @@ String? resolveRedirect({
 
   // OrganizationContextActive: authenticated users with an active
   // organization must land on the primary navigation shell, never remain on
-  // splash/sign-in/organization-setup.
+  // splash/sign-in/organization-setup. organizationReadyPath is the one
+  // deliberate exception (Product Task 077): it is reached only right after
+  // a real organization-creation success, and must not be skipped.
+  if (location == organizationReadyPath) {
+    return null;
+  }
   if (isAtEntryPoint || location == organizationSetupPath) {
     return shellPaths.first;
   }
@@ -101,6 +123,10 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     ),
     routes: [
       GoRoute(path: splashPath, builder: (context, state) => const SplashScreen()),
+      // The pre-auth entry sequence (Product Task 077): onboarding carousel
+      // first, then the real Welcome entry-actions screen.
+      GoRoute(path: onboardingPath, builder: (context, state) => const OnboardingScreen()),
+      GoRoute(path: welcomePath, builder: (context, state) => const WelcomeScreen()),
       GoRoute(
         path: signInPath,
         builder: (context, state) => SignInScreen(successMessage: state.extra as String?),
@@ -114,6 +140,9 @@ final goRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => ResetPasswordScreen(prefilledToken: state.extra as String?),
       ),
       GoRoute(path: organizationSetupPath, builder: (context, state) => const OrganizationSetupScreen()),
+      // Reached only right after a real POST /organizations success (Product
+      // Task 077) — see resolveRedirect's organizationReadyPath exemption.
+      GoRoute(path: organizationReadyPath, builder: (context, state) => const OrganizationReadyScreen()),
       // Pushed above the shell (not a StatefulShellBranch), so the primary
       // bottom navigation is not visible on this screen, matching the
       // frozen Add Person reference.

@@ -169,6 +169,17 @@ void main() {
     expect(find.text('Add Person Screen'), findsOneWidget, reason: 'Add First Person must push /people/add');
   });
 
+  testWidgets('the empty state uses the real "No people yet." illustration, not a generic icon', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(_wrap(const PeoplePage(people: [], nextCursor: null)));
+    await tester.pumpAndSettle();
+
+    final image = tester.widget<Image>(find.byType(Image));
+    expect((image.image as AssetImage).assetName, 'assets/brand/No people.png');
+    expect(find.byIcon(Icons.groups_outlined), findsNothing);
+  });
+
   group('populated person card composition', () {
     testWidgets('renders name, journey badge, phone-before-email order, and the attendance block together', (
       WidgetTester tester,

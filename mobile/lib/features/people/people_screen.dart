@@ -111,7 +111,7 @@ class _PeopleScreenState extends ConsumerState<PeopleScreen> {
             SliverFillRemaining(
               hasScrollBody: false,
               child: EmptyState(
-                icon: Icons.groups_outlined,
+                imageAsset: 'assets/brand/No people.png',
                 title: 'No people yet.',
                 message: 'Start building your community by adding your first person.',
                 action: PrimaryButton(

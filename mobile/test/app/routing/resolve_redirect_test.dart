@@ -35,25 +35,40 @@ void main() {
     );
   });
 
-  test('unauthenticated always redirects to sign-in, overriding organization state', () {
+  test('unauthenticated always redirects to the onboarding carousel, overriding organization state', () {
     expect(
       resolveRedirect(authState: unauthenticated, organizationContext: activeOrganizationContext, location: '/home'),
-      signInPath,
+      onboardingPath,
     );
     expect(
-      resolveRedirect(authState: unauthenticated, organizationContext: emptyOrganizationContext, location: signInPath),
+      resolveRedirect(
+        authState: unauthenticated,
+        organizationContext: emptyOrganizationContext,
+        location: onboardingPath,
+      ),
       isNull,
     );
   });
 
-  test('unauthenticated may reach Create Account, Forgot Password, and Reset Password without redirect', () {
-    for (final preAuthPath in [createAccountPath, forgotPasswordPath, resetPasswordPath]) {
-      expect(
-        resolveRedirect(authState: unauthenticated, organizationContext: emptyOrganizationContext, location: preAuthPath),
-        isNull,
-      );
-    }
-  });
+  test(
+    'unauthenticated may reach onboarding, Welcome, Sign In, Create Account, Forgot Password, and Reset '
+    'Password without redirect',
+    () {
+      for (final preAuthPath in [
+        onboardingPath,
+        welcomePath,
+        signInPath,
+        createAccountPath,
+        forgotPasswordPath,
+        resetPasswordPath,
+      ]) {
+        expect(
+          resolveRedirect(authState: unauthenticated, organizationContext: emptyOrganizationContext, location: preAuthPath),
+          isNull,
+        );
+      }
+    },
+  );
 
   test('authenticated with restoring organization context redirects to splash', () {
     expect(
@@ -78,7 +93,7 @@ void main() {
   });
 
   test('active organization context sends entry-point locations to the first shell tab', () {
-    for (final entryPoint in [splashPath, signInPath, organizationSetupPath]) {
+    for (final entryPoint in [splashPath, onboardingPath, welcomePath, signInPath, organizationSetupPath]) {
       expect(
         resolveRedirect(authState: authenticated, organizationContext: activeOrganizationContext, location: entryPoint),
         shellPaths.first,
@@ -86,13 +101,39 @@ void main() {
     }
   });
 
-  test('an already-authenticated user is bounced away from Create Account/Forgot/Reset Password to the shell', () {
-    for (final preAuthPath in [createAccountPath, forgotPasswordPath, resetPasswordPath]) {
-      expect(
-        resolveRedirect(authState: authenticated, organizationContext: activeOrganizationContext, location: preAuthPath),
-        shellPaths.first,
-      );
-    }
+  test(
+    'an already-authenticated user is bounced away from onboarding/Welcome/Create Account/Forgot/Reset Password '
+    'to the shell',
+    () {
+      for (final preAuthPath in [onboardingPath, welcomePath, createAccountPath, forgotPasswordPath, resetPasswordPath]) {
+        expect(
+          resolveRedirect(authState: authenticated, organizationContext: activeOrganizationContext, location: preAuthPath),
+          shellPaths.first,
+        );
+      }
+    },
+  );
+
+  test('organizationReadyPath is never bounced away while the organization context is active', () {
+    expect(
+      resolveRedirect(
+        authState: authenticated,
+        organizationContext: activeOrganizationContext,
+        location: organizationReadyPath,
+      ),
+      isNull,
+    );
+  });
+
+  test('organizationReadyPath still redirects to organization-setup when there is no active organization', () {
+    expect(
+      resolveRedirect(
+        authState: authenticated,
+        organizationContext: emptyOrganizationContext,
+        location: organizationReadyPath,
+      ),
+      organizationSetupPath,
+    );
   });
 
   test('active organization context leaves shell navigation alone', () {

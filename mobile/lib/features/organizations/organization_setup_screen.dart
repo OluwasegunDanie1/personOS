@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../app/routing/app_router.dart';
 import '../../app/theme/app_colors.dart';
 import '../../app/widgets/brand_mark.dart';
 import '../../app/widgets/labeled_text_field.dart';
@@ -13,7 +15,10 @@ import 'organization_context_controller.dart';
 /// on the approved CreateOrganizationDto (name only), so only the
 /// Organization Name field is implemented. "Skip for now" is also omitted:
 /// the router requires an active organization to reach the primary shell,
-/// so skipping would strand the user with no way forward.
+/// so skipping would strand the user with no way forward. On success,
+/// navigates explicitly to organizationReadyPath (Product Task 077) rather
+/// than relying on the router's own redirect, so the completion screen is
+/// never skipped.
 class OrganizationSetupScreen extends ConsumerStatefulWidget {
   const OrganizationSetupScreen({super.key});
 
@@ -35,6 +40,7 @@ class _OrganizationSetupScreenState extends ConsumerState<OrganizationSetupScree
   }
 
   Future<void> _submit() async {
+    if (_submitting) return;
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -44,7 +50,11 @@ class _OrganizationSetupScreenState extends ConsumerState<OrganizationSetupScree
 
     try {
       await ref.read(organizationContextControllerProvider.notifier).createOrganization(_nameController.text.trim());
+
+      if (!mounted) return;
+      context.go(organizationReadyPath);
     } catch (error) {
+      if (!mounted) return;
       setState(() => _errorMessage = 'Could not create the organization. Please try again.');
     } finally {
       if (mounted) setState(() => _submitting = false);

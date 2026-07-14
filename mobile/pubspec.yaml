@@ -64,6 +64,11 @@ flutter:
 
   assets:
     - assets/brand/relvio_mark.png
+    - assets/brand/Onboarding1.png
+    - assets/brand/onboading2.png
+    - assets/brand/Onboarding3.png
+    - assets/brand/Ready.png
+    - assets/brand/No people.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

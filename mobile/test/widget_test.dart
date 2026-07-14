@@ -14,7 +14,9 @@ import 'package:shared_preferences_platform_interface/in_memory_shared_preferenc
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 void main() {
-  testWidgets('an unauthenticated device boots through splash to the sign-in screen', (WidgetTester tester) async {
+  testWidgets('an unauthenticated device boots through splash into onboarding, Welcome, and Sign In', (
+    WidgetTester tester,
+  ) async {
     FlutterSecureStoragePlatform.instance = TestFlutterSecureStoragePlatform({});
     SharedPreferencesAsyncPlatform.instance = InMemorySharedPreferencesAsync.empty();
 
@@ -37,7 +39,22 @@ void main() {
     await tester.pumpAndSettle();
 
     // No stored tokens means restoration resolves to unauthenticated, which
-    // must redirect to sign-in rather than stranding the user on splash.
+    // must redirect into the onboarding carousel (Product Task 077) — there
+    // is no persisted "has seen onboarding" flag, so this is always the
+    // pre-auth entry point.
+    expect(find.text('Organize everything in one place.'), findsOneWidget);
+    expect(find.text('Welcome back.'), findsNothing);
+
+    await tester.tap(find.text('Skip'));
+    await tester.pumpAndSettle();
+
+    // Skip jumps directly to the carousel's frozen 4th panel ("Let's get
+    // started."), not to any other screen.
+    expect(find.text("Let's get started."), findsOneWidget);
+
+    await tester.tap(find.text('Already a member? Sign In'));
+    await tester.pumpAndSettle();
+
     expect(find.text('Welcome back.'), findsOneWidget);
   });
 }
