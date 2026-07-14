@@ -7,6 +7,7 @@ import { DatabaseModule } from './database/database.module';
 import { EventsModule } from './events/events.module';
 import { FollowUpsModule } from './follow-ups/follow-ups.module';
 import { JourneyModule } from './journey/journey.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { PeopleModule } from './people/people.module';
 import { SecurityModule } from './security/security.module';
@@ -22,6 +23,7 @@ import { SecurityModule } from './security/security.module';
     EventsModule,
     FollowUpsModule,
     DashboardModule,
+    NotificationsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: AccessTokenGuard }],
 })

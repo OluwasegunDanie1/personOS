@@ -1285,24 +1285,8 @@ delivered
 opened
 clicked
 failed
-Notifications
-List Notifications
-GET /notifications
+Notifications is no longer a bare/illustrative path list: it has a real, implemented, organization-scoped contract (Product Task 064), specified in its own "Notifications" section below (before Dashboard Summary). The bare-path disclaimer above applies only to Conversations, Messages, Announcements, and Email Campaigns.
 
-Notifications are scoped to the authenticated user.
-
-Supports:
-
-category
-read
-cursor
-limit
-Mark Notification Read
-PATCH /notifications/{notificationId}/read
-Mark All Notifications Read
-PATCH /notifications/read-all
-Clear Read Notifications
-DELETE /notifications/read
 Roles
 List Roles (Product Task 050)
 GET /organizations/{organizationId}/roles
@@ -1355,6 +1339,60 @@ Ordering: name ascending then id ascending. Empty state (HTTP 200): { "permissio
 
 Update Role Permissions
 PATCH /organizations/{organizationId}/roles/{roleId}/permissions
+
+Notifications
+
+Notifications are organization-scoped and personal: the approved Notification schema (id, organizationId, userId, title, message, isRead, createdAt — no other column exists) ties every row to exactly one user within exactly one organization, so every route below is scoped by both the guard-derived organizationId AND request.auth.userId (the authenticated caller), never a shared organization-wide feed and never another user's notifications. All four routes require the global access-token guard, OrganizationMembershipGuard membership validation, and a validated request.organization context. There is no category column, no notification-generation/trigger authority, no push/email/SMS delivery, and no preferences model — none of these is part of this contract, and none is implemented.
+
+List Notifications
+GET /organizations/{organizationId}/notifications
+
+Approved query parameters (exactly these, no others): cursor, limit, read. There is no category filter (no such column exists).
+
+limit: default 20, minimum 1, maximum 100.
+
+read: optional, exactly "true" or "false"; maps directly to Notification.isRead. Omitted means both read and unread notifications are returned.
+
+Ordering is fixed and not client-selectable: createdAt descending, then id ascending as the deterministic tie-break. Cursor pagination is opaque to the client; its internal encoding is an implementation detail, not part of this API contract.
+
+Success response data:
+
+{
+  "notifications": [
+    {
+      "id": "string",
+      "title": "string",
+      "message": "string",
+      "isRead": "boolean",
+      "createdAt": "string"
+    }
+  ],
+  "nextCursor": "string | null"
+}
+
+Empty state (HTTP 200, standard success envelope): { "notifications": [], "nextCursor": null }.
+
+Mark Notification Read
+PATCH /organizations/{organizationId}/notifications/{notificationId}/read
+
+Scoped by id + organizationId + userId; an absent, cross-tenant, or cross-user notificationId returns NOTIFICATION_NOT_FOUND. Sets isRead to true unconditionally once ownership is verified — idempotent on replay: a repeat call on an already-read notification succeeds identically, never erroring and never producing a different result. Success response data matches one entry of List Notifications' shape, wrapped as { "notification": { ... } }.
+
+Mark All Notifications Read
+PATCH /organizations/{organizationId}/notifications/read-all
+
+A single bounded database UPDATE over every Notification matching organizationId + userId + isRead:false — never a per-record loop, never applied to another user's or another organization's rows. Success response data: { "markedCount": "number" }, the real affected-row count returned by the database, never a fabricated value. markedCount is 0 when there is nothing unread to mark.
+
+Clear Read Notifications
+DELETE /organizations/{organizationId}/notifications/read
+
+The Notification schema has no soft-delete column (no deletedAt), so this is a real, permanent hard delete — a single bounded database DELETE over every Notification matching organizationId + userId + isRead:true, never a per-record loop. isRead:false is never part of this match, so unread notifications can never be cleared by this action. Success response data: { "clearedCount": "number" }, the real affected-row count, never fabricated.
+
+Notification-Domain Error Codes
+
+NOTIFICATION_NOT_FOUND: an absent, cross-tenant, or cross-user notificationId on Mark Notification Read.
+
+Neither this document nor any Notification endpoint defines a category, notification-generation/trigger, push/email/SMS delivery, or preferences contract; none of these is approved or implemented in v1.
+
 Reports
 
 Dashboard Summary is resolved below. Attendance Report, Growth Report, Follow-Up Report, and Export Report remain unresolved and deferred; no field contract, formula, or export mechanism is approved for them. Do not implement them from the bare paths below.
