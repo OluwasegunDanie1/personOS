@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/auth_session_controller.dart';
+import '../../features/auth/create_account_screen.dart';
+import '../../features/auth/forgot_password_screen.dart';
+import '../../features/auth/reset_password_screen.dart';
 import '../../features/auth/sign_in_screen.dart';
 import '../../features/dashboard/home_screen.dart';
 import '../../features/events/create_event_screen.dart';
@@ -28,8 +31,16 @@ import 'primary_navigation_shell.dart';
 
 const splashPath = '/splash';
 const signInPath = '/sign-in';
+const createAccountPath = '/create-account';
+const forgotPasswordPath = '/forgot-password';
+const resetPasswordPath = '/reset-password';
 const organizationSetupPath = '/organization-setup';
 const shellPaths = ['/home', '/people', '/events', '/messages', '/workspace'];
+
+/// Pre-authentication paths reachable while unauthenticated (Product Task
+/// 074): Sign In plus the real Create Account / Forgot Password / Reset
+/// Password flows. None of these requires an existing session.
+const _preAuthPaths = [signInPath, createAccountPath, forgotPasswordPath, resetPasswordPath];
 
 /// Notifies GoRouter to re-evaluate [resolveRedirect] whenever auth or
 /// organization-context state changes.
@@ -53,10 +64,10 @@ String? resolveRedirect({
   }
 
   if (authState.status == AuthStatus.unauthenticated) {
-    return location == signInPath ? null : signInPath;
+    return _preAuthPaths.contains(location) ? null : signInPath;
   }
 
-  final isAtEntryPoint = location == splashPath || location == signInPath;
+  final isAtEntryPoint = location == splashPath || _preAuthPaths.contains(location);
 
   if (organizationContext is OrganizationContextRestoring) {
     return location == splashPath ? null : splashPath;
@@ -90,7 +101,18 @@ final goRouterProvider = Provider<GoRouter>((ref) {
     ),
     routes: [
       GoRoute(path: splashPath, builder: (context, state) => const SplashScreen()),
-      GoRoute(path: signInPath, builder: (context, state) => const SignInScreen()),
+      GoRoute(
+        path: signInPath,
+        builder: (context, state) => SignInScreen(successMessage: state.extra as String?),
+      ),
+      // Real Create Account / Forgot Password / Reset Password flows
+      // (Product Task 072/074), reachable pre-authentication.
+      GoRoute(path: createAccountPath, builder: (context, state) => const CreateAccountScreen()),
+      GoRoute(path: forgotPasswordPath, builder: (context, state) => const ForgotPasswordScreen()),
+      GoRoute(
+        path: resetPasswordPath,
+        builder: (context, state) => ResetPasswordScreen(prefilledToken: state.extra as String?),
+      ),
       GoRoute(path: organizationSetupPath, builder: (context, state) => const OrganizationSetupScreen()),
       // Pushed above the shell (not a StatefulShellBranch), so the primary
       // bottom navigation is not visible on this screen, matching the

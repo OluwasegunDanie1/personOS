@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../app/routing/app_router.dart';
 import '../../app/theme/app_colors.dart';
 import '../../app/widgets/brand_mark.dart';
 import '../../app/widgets/labeled_text_field.dart';
@@ -8,13 +10,18 @@ import '../../app/widgets/primary_button.dart';
 import 'auth_session_controller.dart';
 
 /// Matches design/ui-reference/4.png's "Welcome back." sign-in composition.
-/// The reference also shows Remember me, Forgot Password, Continue with
-/// Google, and a Create Organization footer link — none of those map to an
-/// approved backend capability (no password-reset or OAuth endpoint, and
-/// organization creation requires an authenticated session), so they are
-/// intentionally omitted rather than wired to non-existent functionality.
+/// Forgot Password and a "Create Account" footer link are now real (Product
+/// Task 072/074) — the frozen reference's own footer wording ("Create
+/// Organization") is not reused since the real endpoint only creates a
+/// User, never an Organization; see CreateAccountScreen's own doc comment.
+/// Remember me and Continue with Google remain omitted — no session-
+/// persistence-toggle or OAuth endpoint exists. [successMessage], when
+/// supplied by GoRouter's `extra` after a real Create Account or Reset
+/// Password success, is shown once as a truthful confirmation banner.
 class SignInScreen extends ConsumerStatefulWidget {
-  const SignInScreen({super.key});
+  const SignInScreen({super.key, this.successMessage});
+
+  final String? successMessage;
 
   @override
   ConsumerState<SignInScreen> createState() => _SignInScreenState();
@@ -82,6 +89,29 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
                   ),
+                  if (widget.successMessage != null) ...[
+                    const SizedBox(height: 20),
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF16A34A).withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF16A34A).withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.check_circle_outline, color: Color(0xFF16A34A), size: 20),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              widget.successMessage!,
+                              style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 32),
                   LabeledTextField(
                     label: 'Email Address',
@@ -108,12 +138,26 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                     ),
                     validator: (value) => (value == null || value.isEmpty) ? 'Password is required' : null,
                   ),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: _submitting ? null : () => context.push(forgotPasswordPath),
+                      child: const Text('Forgot Password?'),
+                    ),
+                  ),
                   if (_errorMessage != null) ...[
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 4),
                     Text(_errorMessage!, style: const TextStyle(color: AppColors.danger)),
                   ],
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 12),
                   PrimaryButton(label: 'Sign In', onPressed: _submit, loading: _submitting),
+                  const SizedBox(height: 20),
+                  Center(
+                    child: TextButton(
+                      onPressed: _submitting ? null : () => context.push(createAccountPath),
+                      child: const Text("Don't have an account? Create Account"),
+                    ),
+                  ),
                 ],
               ),
             ),

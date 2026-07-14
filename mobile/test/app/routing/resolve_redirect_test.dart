@@ -46,6 +46,15 @@ void main() {
     );
   });
 
+  test('unauthenticated may reach Create Account, Forgot Password, and Reset Password without redirect', () {
+    for (final preAuthPath in [createAccountPath, forgotPasswordPath, resetPasswordPath]) {
+      expect(
+        resolveRedirect(authState: unauthenticated, organizationContext: emptyOrganizationContext, location: preAuthPath),
+        isNull,
+      );
+    }
+  });
+
   test('authenticated with restoring organization context redirects to splash', () {
     expect(
       resolveRedirect(authState: authenticated, organizationContext: restoringOrganizationContext, location: '/home'),
@@ -72,6 +81,15 @@ void main() {
     for (final entryPoint in [splashPath, signInPath, organizationSetupPath]) {
       expect(
         resolveRedirect(authState: authenticated, organizationContext: activeOrganizationContext, location: entryPoint),
+        shellPaths.first,
+      );
+    }
+  });
+
+  test('an already-authenticated user is bounced away from Create Account/Forgot/Reset Password to the shell', () {
+    for (final preAuthPath in [createAccountPath, forgotPasswordPath, resetPasswordPath]) {
+      expect(
+        resolveRedirect(authState: authenticated, organizationContext: activeOrganizationContext, location: preAuthPath),
         shellPaths.first,
       );
     }

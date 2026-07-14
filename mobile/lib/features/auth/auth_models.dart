@@ -58,3 +58,13 @@ class LoginResult {
   final String refreshToken;
   final PublicUser user;
 }
+
+/// Mirrors POST /auth/forgot-password's response exactly: {message,
+/// developmentResetToken?}. developmentResetToken is only ever present
+/// outside production (Product Task 072) — never assume it exists.
+class ForgotPasswordResult {
+  const ForgotPasswordResult({required this.message, required this.developmentResetToken});
+
+  final String message;
+  final String? developmentResetToken;
+}
