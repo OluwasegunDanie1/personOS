@@ -12,6 +12,15 @@ abstract final class AppTheme {
     return ThemeData(
       colorScheme: colorScheme,
       scaffoldBackgroundColor: AppColors.backgroundPrimary,
+      // Without this, Material3's default OutlinedButton border falls back
+      // to colorScheme.outline (a neutral gray), not the brand blue the
+      // frozen UI uses for every secondary button (Product Task 088).
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.brandPrimary,
+          side: const BorderSide(color: AppColors.brandPrimary),
+        ),
+      ),
     );
   }
 }

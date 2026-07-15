@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/theme/app_colors.dart';
 import '../../app/widgets/labeled_text_field.dart';
 import '../../app/widgets/primary_button.dart';
+import '../../app/widgets/relvio_back_button.dart';
 import 'edit_person_controller.dart';
 import 'people_models.dart';
 
@@ -138,13 +139,7 @@ class _EditPersonScreenState extends ConsumerState<EditPersonScreen> {
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-                child: IconButton(
-                  onPressed: _cancel,
-                  icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  visualDensity: VisualDensity.compact,
-                ),
+                child: RelvioBackButton(onPressed: _cancel),
               ),
               Expanded(child: _Body(personId: widget.personId, state: state, screenState: this)),
             ],

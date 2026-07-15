@@ -76,7 +76,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Center(child: BrandMark(size: 72)),
+                  const Center(child: BrandMark(size: 96)),
                   const SizedBox(height: 24),
                   const Text(
                     'Welcome back.',

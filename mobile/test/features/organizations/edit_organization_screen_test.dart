@@ -23,11 +23,17 @@ class _FakeOrganizationContextController extends OrganizationContextController {
   final OrganizationContextState _initial;
   final _UpdateHandler updateHandler;
   int updateCallCount = 0;
+  int restoreCallCount = 0;
   String? receivedOrganizationId;
   String? receivedName;
 
   @override
   OrganizationContextState build() => _initial;
+
+  @override
+  Future<void> restore() async {
+    restoreCallCount++;
+  }
 
   @override
   Future<void> updateOrganizationName({required String organizationId, required String name}) async {
@@ -59,6 +65,7 @@ Future<_Harness> _pumpEditOrganizationScreen(
   WidgetTester tester, {
   required _UpdateHandler updateHandler,
   OrganizationContextState? initial,
+  bool settle = true,
 }) async {
   final controller = _FakeOrganizationContextController(initial ?? _activeContext(), updateHandler: updateHandler);
 
@@ -68,7 +75,11 @@ Future<_Harness> _pumpEditOrganizationScreen(
       child: const MaterialApp(home: EditOrganizationScreen()),
     ),
   );
-  await tester.pumpAndSettle();
+  if (settle) {
+    await tester.pumpAndSettle();
+  } else {
+    await tester.pump();
+  }
 
   return _Harness(controller);
 }
@@ -177,5 +188,50 @@ void main() {
 
     expect(harness.controller.updateCallCount, 0);
     expect(find.text('Your active organization changed. Please try again.'), findsOneWidget);
+  });
+
+  testWidgets('shows a real loading indicator — never a silently-empty form — while organization context restores', (
+    tester,
+  ) async {
+    await _pumpEditOrganizationScreen(
+      tester,
+      updateHandler: (id, name) async {},
+      initial: const OrganizationContextRestoring(),
+      settle: false,
+    );
+
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.byType(TextFormField), findsNothing);
+  });
+
+  testWidgets('shows a truthful error state (with retry) — never a silently-empty form — on organization context failure', (
+    tester,
+  ) async {
+    final harness = await _pumpEditOrganizationScreen(
+      tester,
+      updateHandler: (id, name) async {},
+      initial: const OrganizationContextFailure('network error'),
+    );
+
+    expect(find.text('Could not load your organization.'), findsOneWidget);
+    expect(find.byType(TextFormField), findsNothing);
+
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Retry'));
+    await tester.pump();
+
+    expect(harness.controller.restoreCallCount, 1);
+  });
+
+  testWidgets('shows a truthful unavailable state — never a silently-empty form — when there is no active organization', (
+    tester,
+  ) async {
+    await _pumpEditOrganizationScreen(
+      tester,
+      updateHandler: (id, name) async {},
+      initial: const OrganizationContextEmpty(),
+    );
+
+    expect(find.text('No active organization is available right now.'), findsOneWidget);
+    expect(find.byType(TextFormField), findsNothing);
   });
 }

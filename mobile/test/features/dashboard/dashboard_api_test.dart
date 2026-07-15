@@ -104,4 +104,33 @@ void main() {
     expect(summary.pendingTasks.single.description, isNull);
     expect(summary.pendingTasks.single.dueDate, isNull);
   });
+
+  test('fetch() defensively treats null upcomingEvents/recentMembers/pendingTasks as empty lists (Product Task 088)', () async {
+    final adapter = _FakeAdapter(
+      (options) async => ResponseBody.fromString(
+        jsonEncode({
+          'success': true,
+          'data': {
+            'totalPeople': 4,
+            'newPeople': 1,
+            'pendingFollowUps': 0,
+            'upcomingEvents': null,
+            'recentMembers': null,
+            'pendingTasks': null,
+          },
+        }),
+        200,
+        headers: {
+          Headers.contentTypeHeader: ['application/json'],
+        },
+      ),
+    );
+    final dio = Dio(BaseOptions(baseUrl: 'https://relvio.test'))..httpClientAdapter = adapter;
+
+    final summary = await DashboardApi(dio).fetch('org-1');
+
+    expect(summary.upcomingEvents, isEmpty);
+    expect(summary.recentMembers, isEmpty);
+    expect(summary.pendingTasks, isEmpty);
+  });
 }

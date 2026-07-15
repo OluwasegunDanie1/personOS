@@ -177,6 +177,28 @@ void main() {
     expect(harness.router.state.uri.toString(), '/create-account');
   });
 
+  testWidgets('shows a truthful rate-limit message for TOO_MANY_REQUESTS, never a generic or fabricated-success message', (
+    tester,
+  ) async {
+    final harness = await _pumpCreateAccountScreen(
+      tester,
+      registerHandler: ({
+        required firstName,
+        required lastName,
+        required email,
+        required password,
+      }) async => throw const ApiException(code: 'TOO_MANY_REQUESTS', message: 'throttled', statusCode: 429),
+    );
+
+    await _fillValidForm(tester);
+    await tester.tap(find.text('Create Account'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Too many attempts. Please wait a few minutes and try again.'), findsOneWidget);
+    expect(find.text('Could not create your account. Please try again.'), findsNothing);
+    expect(harness.router.state.uri.toString(), '/create-account');
+  });
+
   testWidgets('shows a generic error for any other registration failure', (tester) async {
     await _pumpCreateAccountScreen(
       tester,

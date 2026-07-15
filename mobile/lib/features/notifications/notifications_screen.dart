@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/theme/app_colors.dart';
 import '../../app/widgets/empty_state.dart';
+import '../../app/widgets/relvio_back_button.dart';
 import 'notification_models.dart';
 import 'notifications_controller.dart';
 
@@ -44,10 +45,7 @@ class NotificationsScreen extends ConsumerWidget {
               padding: const EdgeInsets.fromLTRB(12, 8, 20, 0),
               child: Row(
                 children: [
-                  IconButton(
-                    onPressed: () => _back(context),
-                    icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-                  ),
+                  RelvioBackButton(onPressed: () => _back(context)),
                   const Expanded(
                     child: Text(
                       'Notifications',

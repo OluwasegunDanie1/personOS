@@ -34,7 +34,7 @@ class WelcomeScreen extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Center(child: BrandMark(size: 88)),
+                const Center(child: BrandMark(size: 104)),
                 const SizedBox(height: 24),
                 Text.rich(
                   textAlign: TextAlign.center,

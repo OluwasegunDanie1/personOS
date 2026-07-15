@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/theme/app_colors.dart';
+import '../../app/widgets/relvio_back_button.dart';
 import '../people/people_models.dart';
 import 'event_check_in_controller.dart';
 import 'events_provider.dart';
@@ -91,10 +92,7 @@ class _EventCheckInScreenState extends ConsumerState<EventCheckInScreen> {
               padding: const EdgeInsets.fromLTRB(12, 8, 20, 0),
               child: Row(
                 children: [
-                  IconButton(
-                    onPressed: () => _back(context),
-                    icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-                  ),
+                  RelvioBackButton(onPressed: () => _back(context)),
                   Expanded(
                     child: eventAsync.when(
                       data: (event) => Column(

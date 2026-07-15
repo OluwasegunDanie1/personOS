@@ -75,7 +75,7 @@ class _OrganizationSetupScreenState extends ConsumerState<OrganizationSetupScree
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Center(child: BrandMark(size: 72)),
+                  const Center(child: BrandMark(size: 96)),
                   const SizedBox(height: 24),
                   const Text(
                     'Set up your organization.',

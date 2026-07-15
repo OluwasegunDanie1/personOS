@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/theme/app_colors.dart';
 import '../../app/widgets/labeled_text_field.dart';
 import '../../app/widgets/primary_button.dart';
+import '../../app/widgets/relvio_back_button.dart';
 import 'create_follow_up_controller.dart';
 
 /// Native Relvio form for the current Person only (no Person picker — the
@@ -89,13 +90,7 @@ class _CreateFollowUpScreenState extends ConsumerState<CreateFollowUpScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  IconButton(
-                    onPressed: _cancel,
-                    icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    visualDensity: VisualDensity.compact,
-                  ),
+                  RelvioBackButton(onPressed: _cancel),
                   const SizedBox(height: 12),
                   const Text(
                     'Create Follow-up.',

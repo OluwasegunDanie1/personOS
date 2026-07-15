@@ -92,17 +92,21 @@ class DashboardSummary {
   final List<RecentMember> recentMembers;
   final List<PendingTask> pendingTasks;
 
+  /// Each list field is defensively treated as empty when absent/null
+  /// (Product Task 088) rather than crashing the whole dashboard — the
+  /// approved contract always returns a real array, but this keeps the
+  /// screen resilient to any transient serialization anomaly.
   factory DashboardSummary.fromJson(Map<String, dynamic> json) => DashboardSummary(
     totalPeople: json['totalPeople'] as int,
     newPeople: json['newPeople'] as int,
     pendingFollowUps: json['pendingFollowUps'] as int,
-    upcomingEvents: (json['upcomingEvents'] as List<dynamic>)
+    upcomingEvents: (json['upcomingEvents'] as List<dynamic>? ?? const [])
         .map((event) => UpcomingEvent.fromJson(event as Map<String, dynamic>))
         .toList(),
-    recentMembers: (json['recentMembers'] as List<dynamic>)
+    recentMembers: (json['recentMembers'] as List<dynamic>? ?? const [])
         .map((member) => RecentMember.fromJson(member as Map<String, dynamic>))
         .toList(),
-    pendingTasks: (json['pendingTasks'] as List<dynamic>)
+    pendingTasks: (json['pendingTasks'] as List<dynamic>? ?? const [])
         .map((task) => PendingTask.fromJson(task as Map<String, dynamic>))
         .toList(),
   );

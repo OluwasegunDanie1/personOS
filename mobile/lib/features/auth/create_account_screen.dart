@@ -7,6 +7,7 @@ import '../../app/theme/app_colors.dart';
 import '../../app/widgets/brand_mark.dart';
 import '../../app/widgets/labeled_text_field.dart';
 import '../../app/widgets/primary_button.dart';
+import '../../app/widgets/relvio_back_button.dart';
 import '../../core/api/api_exceptions.dart';
 import '../../core/providers.dart';
 
@@ -86,9 +87,14 @@ class _CreateAccountScreenState extends ConsumerState<CreateAccountScreen> {
     } on ApiException catch (error) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = error.code == 'EMAIL_ALREADY_REGISTERED'
-            ? 'An account with this email already exists.'
-            : 'Could not create your account. Please try again.';
+        _errorMessage = switch (error.code) {
+          'EMAIL_ALREADY_REGISTERED' => 'An account with this email already exists.',
+          // Real rate limiting (POST /auth/register is throttled to 5 per 15
+          // minutes) — never fabricate a successful registration, and never
+          // hide the true cause behind the generic message (Product Task 088).
+          'TOO_MANY_REQUESTS' => 'Too many attempts. Please wait a few minutes and try again.',
+          _ => 'Could not create your account. Please try again.',
+        };
       });
     } catch (_) {
       if (!mounted) return;
@@ -114,12 +120,11 @@ class _CreateAccountScreenState extends ConsumerState<CreateAccountScreen> {
                 children: [
                   Align(
                     alignment: Alignment.centerLeft,
-                    child: IconButton(
+                    child: RelvioBackButton(
                       onPressed: () => context.canPop() ? context.pop() : context.go(signInPath),
-                      icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
                     ),
                   ),
-                  const Center(child: BrandMark(size: 72)),
+                  const Center(child: BrandMark(size: 96)),
                   const SizedBox(height: 24),
                   const Text(
                     'Create your account.',

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../app/theme/app_colors.dart';
 import '../../app/widgets/empty_state.dart';
+import '../../app/widgets/relvio_back_button.dart';
 import '../organizations/organization_models.dart';
 import 'organization_members_provider.dart';
 
@@ -31,13 +32,7 @@ class OrganizationMembersScreen extends ConsumerWidget {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-              child: IconButton(
-                onPressed: () => Navigator.of(context).maybePop(),
-                icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                visualDensity: VisualDensity.compact,
-              ),
+              child: const RelvioBackButton(),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),

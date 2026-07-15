@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/theme/app_colors.dart';
+import '../../app/widgets/relvio_back_button.dart';
 import 'people_models.dart';
 import 'person_profile_controller.dart';
 
@@ -50,10 +51,7 @@ class PersonProfileScreen extends ConsumerWidget {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-              child: IconButton(
-                onPressed: () => _back(context),
-                icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-              ),
+              child: RelvioBackButton(onPressed: () => _back(context)),
             ),
             Expanded(child: _ProfileBody(personId: personId, state: state)),
           ],

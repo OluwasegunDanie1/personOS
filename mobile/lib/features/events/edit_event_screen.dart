@@ -6,6 +6,7 @@ import '../../app/theme/app_colors.dart';
 import '../../app/widgets/date_time_picker_fields.dart';
 import '../../app/widgets/labeled_text_field.dart';
 import '../../app/widgets/primary_button.dart';
+import '../../app/widgets/relvio_back_button.dart';
 import 'edit_event_controller.dart';
 import 'event_models.dart';
 
@@ -182,13 +183,7 @@ class _EditEventScreenState extends ConsumerState<EditEventScreen> {
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
                 child: Row(
                   children: [
-                    IconButton(
-                      onPressed: _cancel,
-                      icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      visualDensity: VisualDensity.compact,
-                    ),
+                    RelvioBackButton(onPressed: _cancel),
                     const Spacer(),
                     if (state.loadStatus == EditEventLoadStatus.loaded &&
                         _hydrated &&

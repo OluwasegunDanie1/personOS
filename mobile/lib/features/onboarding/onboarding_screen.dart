@@ -211,7 +211,7 @@ class _GetStartedPage extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const SizedBox(height: 16),
-          const Center(child: BrandMark(size: 88)),
+          const Center(child: BrandMark(size: 104)),
           const SizedBox(height: 32),
           const Text(
             "Let's get started.",

@@ -6,6 +6,7 @@ import '../../app/theme/app_colors.dart';
 import '../../app/widgets/date_time_picker_fields.dart';
 import '../../app/widgets/labeled_text_field.dart';
 import '../../app/widgets/primary_button.dart';
+import '../../app/widgets/relvio_back_button.dart';
 import 'create_event_controller.dart';
 
 /// Matches design/ui-reference/9.png's numbered-card "Create a new event."
@@ -107,13 +108,7 @@ class _CreateEventScreenState extends ConsumerState<CreateEventScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  IconButton(
-                    onPressed: _cancel,
-                    icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    visualDensity: VisualDensity.compact,
-                  ),
+                  RelvioBackButton(onPressed: _cancel),
                   const SizedBox(height: 12),
                   const Text(
                     'Create a new event.',
