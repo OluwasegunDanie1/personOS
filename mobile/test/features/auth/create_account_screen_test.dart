@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:relvio/app/widgets/relvio_back_button.dart';
 import 'package:relvio/core/api/api_exceptions.dart';
 import 'package:relvio/core/providers.dart';
 import 'package:relvio/features/auth/auth_api.dart';
@@ -106,11 +107,12 @@ Future<_Harness> _pumpCreateAccountScreen(WidgetTester tester, {required _Regist
   return _Harness(router, api, authController);
 }
 
-Future<void> _fillValidForm(WidgetTester tester) async {
+Future<void> _fillValidForm(WidgetTester tester, {String password = 'password123', String? confirmPassword}) async {
   await tester.enterText(find.widgetWithText(TextFormField, 'Enter first name'), 'Ada');
   await tester.enterText(find.widgetWithText(TextFormField, 'Enter last name'), 'Lovelace');
   await tester.enterText(find.widgetWithText(TextFormField, 'Enter your email'), 'ada@example.com');
-  await tester.enterText(find.widgetWithText(TextFormField, 'Create a password'), 'password123');
+  await tester.enterText(find.widgetWithText(TextFormField, 'Create a password'), password);
+  await tester.enterText(find.widgetWithText(TextFormField, 'Confirm your password'), confirmPassword ?? password);
 }
 
 void main() {
@@ -263,6 +265,90 @@ void main() {
     expect(harness.api.registerCallCount, 0);
     expect(find.text('First name is required'), findsOneWidget);
     expect(find.text('Email is required'), findsOneWidget);
+  });
+
+  testWidgets('requires Confirm Password and blocks submission when empty', (tester) async {
+    final harness = await _pumpCreateAccountScreen(
+      tester,
+      registerHandler: ({
+        required firstName,
+        required lastName,
+        required email,
+        required password,
+      }) async => _fixtureUser(email: email),
+    );
+
+    await tester.enterText(find.widgetWithText(TextFormField, 'Enter first name'), 'Ada');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Enter last name'), 'Lovelace');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Enter your email'), 'ada@example.com');
+    await tester.enterText(find.widgetWithText(TextFormField, 'Create a password'), 'password123');
+    await tester.tap(find.text('Create Account'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Please confirm your password'), findsOneWidget);
+    expect(harness.api.registerCallCount, 0);
+  });
+
+  testWidgets('blocks submission and reports a mismatch when Confirm Password differs from Password', (
+    tester,
+  ) async {
+    final harness = await _pumpCreateAccountScreen(
+      tester,
+      registerHandler: ({
+        required firstName,
+        required lastName,
+        required email,
+        required password,
+      }) async => _fixtureUser(email: email),
+    );
+
+    await _fillValidForm(tester, password: 'password123', confirmPassword: 'different456');
+    await tester.tap(find.text('Create Account'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Passwords do not match'), findsOneWidget);
+    expect(harness.api.registerCallCount, 0);
+  });
+
+  testWidgets('never sends Confirm Password to the API — only firstName/lastName/email/password reach register()', (
+    tester,
+  ) async {
+    final harness = await _pumpCreateAccountScreen(
+      tester,
+      registerHandler: ({
+        required firstName,
+        required lastName,
+        required email,
+        required password,
+      }) async => _fixtureUser(email: email),
+    );
+
+    // AuthApi.register() has no confirmPassword parameter at all — the fake
+    // above only accepts firstName/lastName/email/password, so a successful
+    // call through this exact signature is itself proof Confirm Password is
+    // never transmitted (Product Task 090).
+    await _fillValidForm(tester, password: 'password123', confirmPassword: 'password123');
+    await tester.tap(find.text('Create Account'));
+    await tester.pumpAndSettle();
+
+    expect(harness.api.registerCallCount, 1);
+    expect(harness.router.state.uri.toString(), '/sign-in');
+  });
+
+  testWidgets('renders no boxed back button at all — the frozen panel shows none (Product Task 090A)', (
+    tester,
+  ) async {
+    await _pumpCreateAccountScreen(
+      tester,
+      registerHandler: ({
+        required firstName,
+        required lastName,
+        required email,
+        required password,
+      }) async => _fixtureUser(email: email),
+    );
+
+    expect(find.byType(RelvioBackButton), findsNothing);
   });
 
   testWidgets('the "Already have an account? Sign In" link routes to Sign In', (tester) async {

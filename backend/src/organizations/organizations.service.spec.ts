@@ -124,7 +124,81 @@ describe('OrganizationsService', () => {
       expect(typeof args.data.id).toBe('string');
       expect(typeof args.data.slug).toBe('string');
       expect(args.data.slug).toContain(args.data.id);
-      expect(args.select).toEqual({ id: true, name: true });
+      expect(args.select).toEqual({ id: true, name: true, industry: true, country: true, timezone: true });
+    });
+
+    it('persists supplied industry/country/timezone (Product Task 092)', async () => {
+      prisma.organization.create.mockResolvedValue({ id: 'org-1', name: 'Acme' });
+      prisma.role.create.mockResolvedValue({ id: 'role-1' });
+
+      await service.create('user-1', {
+        name: 'Acme',
+        industry: 'Non-Profit',
+        country: 'Nigeria',
+        timezone: 'UTC+01:00',
+      } as never);
+
+      const args = prisma.organization.create.mock.calls[0][0];
+      expect(args.data.industry).toBe('Non-Profit');
+      expect(args.data.country).toBe('Nigeria');
+      expect(args.data.timezone).toBe('UTC+01:00');
+    });
+
+    it('persists null for industry/country/timezone when they are omitted', async () => {
+      prisma.organization.create.mockResolvedValue({ id: 'org-1', name: 'Acme' });
+      prisma.role.create.mockResolvedValue({ id: 'role-1' });
+
+      await service.create('user-1', { name: 'Acme' } as never);
+
+      const args = prisma.organization.create.mock.calls[0][0];
+      expect(args.data.industry).toBeNull();
+      expect(args.data.country).toBeNull();
+      expect(args.data.timezone).toBeNull();
+    });
+
+    it('response exposes the real persisted industry/country/timezone, never fabricated', async () => {
+      prisma.organization.create.mockResolvedValue({
+        id: 'org-1',
+        name: 'Acme',
+        industry: 'Non-Profit',
+        country: 'Nigeria',
+        timezone: 'UTC+01:00',
+      });
+      prisma.role.create.mockResolvedValue({ id: 'role-1' });
+      (prisma as unknown as { organizationMembership: { create: jest.Mock } }).organizationMembership.create = jest
+        .fn()
+        .mockResolvedValue({ id: 'membership-1' });
+
+      const result = await service.create('user-1', {
+        name: 'Acme',
+        industry: 'Non-Profit',
+        country: 'Nigeria',
+        timezone: 'UTC+01:00',
+      } as never);
+
+      expect(result).toEqual({
+        organization: { id: 'org-1', name: 'Acme', industry: 'Non-Profit', country: 'Nigeria', timezone: 'UTC+01:00' },
+      });
+    });
+
+    it('response exposes real null industry/country/timezone when the database value is null', async () => {
+      prisma.organization.create.mockResolvedValue({
+        id: 'org-1',
+        name: 'Acme',
+        industry: null,
+        country: null,
+        timezone: null,
+      });
+      prisma.role.create.mockResolvedValue({ id: 'role-1' });
+      (prisma as unknown as { organizationMembership: { create: jest.Mock } }).organizationMembership.create = jest
+        .fn()
+        .mockResolvedValue({ id: 'membership-1' });
+
+      const result = await service.create('user-1', { name: 'Acme' } as never);
+
+      expect(result).toEqual({
+        organization: { id: 'org-1', name: 'Acme', industry: null, country: null, timezone: null },
+      });
     });
 
     it('creates exactly one Role named "Owner" scoped to the new Organization', async () => {
@@ -217,7 +291,7 @@ describe('OrganizationsService', () => {
 
       const args = prisma.organization.findFirst.mock.calls[0][0];
       expect(args.where).toEqual({ id: 'org-1' });
-      expect(args.select).toEqual({ id: true, name: true });
+      expect(args.select).toEqual({ id: true, name: true, industry: true, country: true, timezone: true });
     });
 
     it('returns exactly {organization: {id, name}}', async () => {
@@ -236,7 +310,7 @@ describe('OrganizationsService', () => {
   });
 
   describe('update', () => {
-    it('scopes the mutation by organizationId and writes only name', async () => {
+    it('scopes the mutation by organizationId and writes only the supplied name', async () => {
       prisma.organization.update.mockResolvedValue({ id: 'org-1', name: 'Updated' });
 
       await service.update('org-1', { name: 'Updated' } as never);
@@ -244,15 +318,48 @@ describe('OrganizationsService', () => {
       const args = prisma.organization.update.mock.calls[0][0];
       expect(args.where).toEqual({ id: 'org-1' });
       expect(args.data).toEqual({ name: 'Updated' });
-      expect(args.select).toEqual({ id: true, name: true });
+      expect(args.select).toEqual({ id: true, name: true, industry: true, country: true, timezone: true });
     });
 
-    it('returns exactly {organization: {id, name}}', async () => {
-      prisma.organization.update.mockResolvedValue({ id: 'org-1', name: 'Updated' });
+    it('writes changed industry/country/timezone (Product Task 092)', async () => {
+      prisma.organization.update.mockResolvedValue({ id: 'org-1', name: 'Acme' });
+
+      await service.update('org-1', {
+        industry: 'Education',
+        country: 'Ghana',
+        timezone: 'UTC+00:00',
+      } as never);
+
+      const args = prisma.organization.update.mock.calls[0][0];
+      expect(args.data).toEqual({ industry: 'Education', country: 'Ghana', timezone: 'UTC+00:00' });
+    });
+
+    it('a partial update writes only the explicitly-supplied fields, leaving the rest untouched', async () => {
+      prisma.organization.update.mockResolvedValue({ id: 'org-1', name: 'Acme' });
+
+      await service.update('org-1', { country: 'Kenya' } as never);
+
+      const args = prisma.organization.update.mock.calls[0][0];
+      expect(args.data).toEqual({ country: 'Kenya' });
+      expect(args.data).not.toHaveProperty('name');
+      expect(args.data).not.toHaveProperty('industry');
+      expect(args.data).not.toHaveProperty('timezone');
+    });
+
+    it('returns exactly {organization: {id, name, industry, country, timezone}}', async () => {
+      prisma.organization.update.mockResolvedValue({
+        id: 'org-1',
+        name: 'Updated',
+        industry: 'Education',
+        country: 'Ghana',
+        timezone: 'UTC+00:00',
+      });
 
       const result = await service.update('org-1', { name: 'Updated' } as never);
 
-      expect(result).toEqual({ organization: { id: 'org-1', name: 'Updated' } });
+      expect(result).toEqual({
+        organization: { id: 'org-1', name: 'Updated', industry: 'Education', country: 'Ghana', timezone: 'UTC+00:00' },
+      });
     });
   });
 

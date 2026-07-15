@@ -26,16 +26,32 @@ class OrganizationSummary {
   );
 }
 
-/// Mirrors the narrower Create/Detail/Update Organization response shape
-/// exactly: {id, name} only — no industry/logoUrl/country/timezone/etc.
+/// Mirrors the real Create/Detail/Update Organization response shape exactly:
+/// {id, name, industry, country, timezone} (Product Task 092). logoUrl,
+/// email, phone, address, and subscriptionPlan remain excluded — none of
+/// those is approved API authority.
 class OrganizationDetail {
-  const OrganizationDetail({required this.id, required this.name});
+  const OrganizationDetail({
+    required this.id,
+    required this.name,
+    required this.industry,
+    required this.country,
+    required this.timezone,
+  });
 
   final String id;
   final String name;
+  final String? industry;
+  final String? country;
+  final String? timezone;
 
-  factory OrganizationDetail.fromJson(Map<String, dynamic> json) =>
-      OrganizationDetail(id: json['id'] as String, name: json['name'] as String);
+  factory OrganizationDetail.fromJson(Map<String, dynamic> json) => OrganizationDetail(
+    id: json['id'] as String,
+    name: json['name'] as String,
+    industry: json['industry'] as String?,
+    country: json['country'] as String?,
+    timezone: json['timezone'] as String?,
+  );
 }
 
 /// Mirrors GET /organizations/:organizationId/members' per-user shape

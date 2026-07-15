@@ -4,7 +4,9 @@ import 'theme/app_colors.dart';
 import 'widgets/brand_mark.dart';
 
 /// Matches design/ui-reference/splash.png: the Relvio mark and wordmark
-/// centered on the brand background, with no visible spinner.
+/// centered on the brand background, with no visible spinner. The gap
+/// between mark and wordmark is deliberately tight (Product Task 090A) so
+/// they read as one connected brand lockup, not two separate elements.
 class SplashScreen extends StatelessWidget {
   const SplashScreen({super.key});
 
@@ -17,7 +19,7 @@ class SplashScreen extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             BrandMark(size: 120),
-            SizedBox(height: 20),
+            SizedBox(height: 4),
             Text(
               'Relvio',
               style: TextStyle(fontSize: 40, fontWeight: FontWeight.w800, color: AppColors.brandPrimary),

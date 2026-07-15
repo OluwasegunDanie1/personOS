@@ -98,13 +98,21 @@ String? resolveRedirect({
 
   // OrganizationContextActive: authenticated users with an active
   // organization must land on the primary navigation shell, never remain on
-  // splash/sign-in/organization-setup. organizationReadyPath is the one
-  // deliberate exception (Product Task 077): it is reached only right after
-  // a real organization-creation success, and must not be skipped.
+  // splash/sign-in. organizationReadyPath is never bounced (Product Task
+  // 077): it is reached only right after a real organization-creation
+  // success, and must not be skipped. organizationSetupPath is deliberately
+  // NOT included in the bounce condition below (Product Task 092, fixing a
+  // real reactive-router race identified in Task 090B): the org-context
+  // state transitions to Active *during* OrganizationSetupScreen's own
+  // createOrganization() call, while the router's current location is
+  // still organizationSetupPath — if this branch bounced that location to
+  // the shell, it would win the race against the screen's own subsequent
+  // `context.go(organizationReadyPath)` call and skip Ready entirely. The
+  // screen's explicit navigation is the sole, sufficient way off Setup.
   if (location == organizationReadyPath) {
     return null;
   }
-  if (isAtEntryPoint || location == organizationSetupPath) {
+  if (isAtEntryPoint) {
     return shellPaths.first;
   }
 

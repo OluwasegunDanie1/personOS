@@ -24,8 +24,19 @@ class OrganizationsApi {
         .toList();
   }
 
-  Future<OrganizationDetail> create(String name) async {
-    final response = await _dio.post<dynamic>('/organizations', data: {'name': name});
+  /// industry/country/timezone are real, optional fields (Product Task 092)
+  /// — omitted from the request entirely when not supplied, never sent as
+  /// empty strings.
+  Future<OrganizationDetail> create(String name, {String? industry, String? country, String? timezone}) async {
+    final response = await _dio.post<dynamic>(
+      '/organizations',
+      data: {
+        'name': name,
+        if (industry != null && industry.isNotEmpty) 'industry': industry,
+        if (country != null && country.isNotEmpty) 'country': country,
+        if (timezone != null && timezone.isNotEmpty) 'timezone': timezone,
+      },
+    );
     final data = unwrapEnvelope(response) as Map<String, dynamic>;
     return OrganizationDetail.fromJson(data['organization'] as Map<String, dynamic>);
   }

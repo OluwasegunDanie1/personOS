@@ -93,13 +93,29 @@ void main() {
   });
 
   test('active organization context sends entry-point locations to the first shell tab', () {
-    for (final entryPoint in [splashPath, onboardingPath, welcomePath, signInPath, organizationSetupPath]) {
+    for (final entryPoint in [splashPath, onboardingPath, welcomePath, signInPath]) {
       expect(
         resolveRedirect(authState: authenticated, organizationContext: activeOrganizationContext, location: entryPoint),
         shellPaths.first,
       );
     }
   });
+
+  test(
+    'organizationSetupPath is never bounced away while the organization context is active (Product Task 092 '
+    'routing-race fix): OrganizationSetupScreen\'s own explicit navigation to organizationReadyPath is the sole '
+    'way off it',
+    () {
+      expect(
+        resolveRedirect(
+          authState: authenticated,
+          organizationContext: activeOrganizationContext,
+          location: organizationSetupPath,
+        ),
+        isNull,
+      );
+    },
+  );
 
   test(
     'an already-authenticated user is bounced away from onboarding/Welcome/Create Account/Forgot/Reset Password '

@@ -453,9 +453,9 @@ Requires the global access-token guard only; it is never organization-scoped (th
 
 Request fields (no others accepted):
 
-{ "name": "string" }
+{ "name": "string", "industry": "string (optional)", "country": "string (optional)", "timezone": "string (optional)" }
 
-name is required, trimmed, and must remain non-empty after trim. There is no maximum length beyond what the existing validation conventions already impose, no slug field, and no uniqueness constraint on name — two Organizations may share the same name. The request never accepts industry, logoUrl, country, timezone, role, ownerId, setupComplete, status, or any billing/plan field; all are rejected as unknown fields by the existing global ValidationPipe.
+name is required, trimmed, and must remain non-empty after trim. There is no maximum length beyond what the existing validation conventions already impose, no slug field, and no uniqueness constraint on name — two Organizations may share the same name. industry, country, and timezone are optional, free-form strings (Product Task 092): trimmed, with an empty/whitespace-only value normalized to null. No approved enum or finite list exists for any of the three — the client is never authorized to invent one, and none is enforced server-side. The request never accepts logoUrl, email, phone, address, role, ownerId, setupComplete, status, or any billing/plan field; all remain rejected as unknown fields by the existing global ValidationPipe.
 
 Creation is one atomic operation (a single Prisma transaction) creating exactly three rows: the Organization; exactly one Role named "Owner" scoped to that new Organization (organizationId = the new Organization's id); and exactly one OrganizationMembership linking the authenticated creator User, the new Organization, and that new Role. This mirrors the naming convention already established by the approved Organization Fixture (16_Security.md, Deployment.md), extended here into the real, non-fixture creation path. Zero Permission or RolePermission rows are created; permission enforcement remains deferred as it is everywhere else in v1. If any part of this transaction fails, no Organization, Role, or OrganizationMembership row is left behind (no orphan Organization).
 
@@ -466,9 +466,14 @@ Success response data (HTTP 201, standard success envelope):
 {
   "organization": {
     "id": "string",
-    "name": "string"
+    "name": "string",
+    "industry": "string | null",
+    "country": "string | null",
+    "timezone": "string | null"
   }
 }
+
+industry/country/timezone reflect exactly what was persisted — null when omitted or not supplied, never fabricated. logoUrl, email, phone, address, and subscriptionPlan remain excluded; this document does not approve exposing them (organization logo upload remains a separate, unapproved capability requiring real file-storage infrastructure).
 
 Immediately after creation, the creator is an active member of the new Organization: GET /organizations returns the new Organization in the caller's list (with role name "Owner"), and every existing OrganizationMembershipGuard-protected endpoint (People, Journey, Events, Attendance, Follow-Ups, Dashboard Summary) works against the new organizationId without any fixture or manual provisioning step.
 
@@ -482,18 +487,21 @@ Success response data:
 {
   "organization": {
     "id": "string",
-    "name": "string"
+    "name": "string",
+    "industry": "string | null",
+    "country": "string | null",
+    "timezone": "string | null"
   }
 }
 
-industry, logoUrl, country, timezone, email, phone, address, and subscriptionPlan are not included; this document does not approve exposing them.
+logoUrl, email, phone, address, and subscriptionPlan are not included; this document does not approve exposing them.
 
 Update Organization
 PATCH /organizations/{organizationId}
 
-Requires the global access-token guard, OrganizationMembershipGuard, and a validated request.organization context. No role-specific restriction is approved for this endpoint in v1: any active member may update name; there is no Owner-only or Administrator-only enforcement, because v1 has no approved permission-enforcement mechanism. This membership-only boundary is explicit and temporary pending a future approved role/permission slice.
+Requires the global access-token guard, OrganizationMembershipGuard, and a validated request.organization context. No role-specific restriction is approved for this endpoint in v1: any active member may update these fields; there is no Owner-only or Administrator-only enforcement, because v1 has no approved permission-enforcement mechanism. This membership-only boundary is explicit and temporary pending a future approved role/permission slice.
 
-Mutable fields (no others accepted): { "name": "string" }. name is the only approved mutable field; at least one accepted field (i.e. name) must be supplied, trimmed, and non-empty. industry, logoUrl, country, timezone, role, ownerId, and any setup-state or billing/plan field are rejected as unknown fields.
+Mutable fields (no others accepted): { "name": "string (optional)", "industry": "string (optional)", "country": "string (optional)", "timezone": "string (optional)" }. All four are independently optional (Product Task 092) — a genuine partial update: any non-empty subset may be supplied, and an empty body is accepted as a no-op, matching every other multi-field PATCH endpoint in this API (Person, Event, Follow-Up). name, when supplied, must be trimmed and non-empty (it can never be cleared to null); industry/country/timezone, when supplied, may be explicitly cleared to null. logoUrl, email, phone, address, role, ownerId, and any setup-state or billing/plan field are rejected as unknown fields.
 
 Success response data matches Get Organization's shape. An absent or non-member-accessible Organization returns ORGANIZATION_ACCESS_DENIED.
 

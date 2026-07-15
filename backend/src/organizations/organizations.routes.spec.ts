@@ -202,15 +202,47 @@ describe('Organizations route composition', () => {
       expect(prisma.organizationMembership.findUnique).not.toHaveBeenCalled();
     });
 
-    it('returns HTTP 201 with exactly {organization: {id, name}}', async () => {
-      prisma.organization.create.mockResolvedValue({ id: ORG_ID, name: 'Acme' });
+    it('returns HTTP 201 with exactly {organization: {id, name, industry, country, timezone}}', async () => {
+      prisma.organization.create.mockResolvedValue({
+        id: ORG_ID,
+        name: 'Acme',
+        industry: 'Non-Profit',
+        country: 'Nigeria',
+        timezone: 'UTC+01:00',
+      });
+      prisma.role.create.mockResolvedValue({ id: 'role-1' });
+      prisma.organizationMembership.create.mockResolvedValue({ id: 'membership-1' });
+
+      const { status, json } = await request('POST', '/api/v1/organizations', validToken, {
+        name: 'Acme',
+        industry: 'Non-Profit',
+        country: 'Nigeria',
+        timezone: 'UTC+01:00',
+      });
+
+      expect(status).toBe(201);
+      expect(json.data).toEqual({
+        organization: { id: ORG_ID, name: 'Acme', industry: 'Non-Profit', country: 'Nigeria', timezone: 'UTC+01:00' },
+      });
+    });
+
+    it('accepts a request with only name — industry/country/timezone are genuinely optional (Product Task 092)', async () => {
+      prisma.organization.create.mockResolvedValue({
+        id: ORG_ID,
+        name: 'Acme',
+        industry: null,
+        country: null,
+        timezone: null,
+      });
       prisma.role.create.mockResolvedValue({ id: 'role-1' });
       prisma.organizationMembership.create.mockResolvedValue({ id: 'membership-1' });
 
       const { status, json } = await request('POST', '/api/v1/organizations', validToken, { name: 'Acme' });
 
       expect(status).toBe(201);
-      expect(json.data).toEqual({ organization: { id: ORG_ID, name: 'Acme' } });
+      expect(json.data).toEqual({
+        organization: { id: ORG_ID, name: 'Acme', industry: null, country: null, timezone: null },
+      });
     });
 
     it('rejects a missing name with a validation error', async () => {
@@ -226,7 +258,7 @@ describe('Organizations route composition', () => {
       expect(status).toBe(400);
     });
 
-    it('rejects unknown fields (industry, logoUrl, ownerId, role, setupComplete)', async () => {
+    it('rejects unknown fields (logoUrl, ownerId, role, setupComplete) even alongside now-approved fields', async () => {
       const { status } = await request('POST', '/api/v1/organizations', validToken, {
         name: 'Acme',
         industry: 'Nonprofit',
@@ -268,19 +300,27 @@ describe('Organizations route composition', () => {
       expect(json.error?.code).toBe('ORGANIZATION_ACCESS_DENIED');
     });
 
-    it('returns exactly {organization: {id, name}} for an active member', async () => {
+    it('returns exactly {organization: {id, name, industry, country, timezone}} for an active member', async () => {
       prisma.user.findUnique.mockResolvedValue({ id: 'user-1', status: 'ACTIVE', deletedAt: null });
       prisma.organizationMembership.findUnique.mockResolvedValue({
         id: 'membership-1',
         organizationId: ORG_ID,
         roleId: 'role-1',
       });
-      prisma.organization.findFirst.mockResolvedValue({ id: ORG_ID, name: 'Acme' });
+      prisma.organization.findFirst.mockResolvedValue({
+        id: ORG_ID,
+        name: 'Acme',
+        industry: 'Non-Profit',
+        country: 'Nigeria',
+        timezone: 'UTC+01:00',
+      });
 
       const { status, json } = await request('GET', `/api/v1/organizations/${ORG_ID}`, validToken);
 
       expect(status).toBe(200);
-      expect(json.data).toEqual({ organization: { id: ORG_ID, name: 'Acme' } });
+      expect(json.data).toEqual({
+        organization: { id: ORG_ID, name: 'Acme', industry: 'Non-Profit', country: 'Nigeria', timezone: 'UTC+01:00' },
+      });
     });
   });
 
@@ -314,30 +354,77 @@ describe('Organizations route composition', () => {
       expect(json.error?.code).toBe('ORGANIZATION_ACCESS_DENIED');
     });
 
-    it('rejects an empty body', async () => {
+    // Product Task 092: name, industry, country, and timezone are now all
+    // independently optional on Update — a genuine partial-update contract,
+    // matching every other multi-field PATCH endpoint in this codebase
+    // (Person, Event, FollowUp), none of which rejects an empty body either.
+    it('accepts an empty body as a no-op partial update', async () => {
+      prisma.organization.update.mockResolvedValue({
+        id: ORG_ID,
+        name: 'Acme',
+        industry: null,
+        country: null,
+        timezone: null,
+      });
+
       const { status } = await request('PATCH', `/api/v1/organizations/${ORG_ID}`, validToken, {});
 
-      expect(status).toBe(400);
+      expect(status).toBe(200);
     });
 
-    it('rejects unknown fields', async () => {
+    it('accepts industry/country/timezone alone, without name', async () => {
+      prisma.organization.update.mockResolvedValue({
+        id: ORG_ID,
+        name: 'Acme',
+        industry: 'Education',
+        country: 'Ghana',
+        timezone: 'UTC+00:00',
+      });
+
+      const { status, json } = await request('PATCH', `/api/v1/organizations/${ORG_ID}`, validToken, {
+        industry: 'Education',
+        country: 'Ghana',
+        timezone: 'UTC+00:00',
+      });
+
+      expect(status).toBe(200);
+      expect(json.data).toEqual({
+        organization: { id: ORG_ID, name: 'Acme', industry: 'Education', country: 'Ghana', timezone: 'UTC+00:00' },
+      });
+    });
+
+    it('rejects genuinely unknown fields (logoUrl)', async () => {
       const { status } = await request('PATCH', `/api/v1/organizations/${ORG_ID}`, validToken, {
         name: 'Updated',
-        industry: 'Nonprofit',
+        logoUrl: 'https://example.com/logo.png',
       });
 
       expect(status).toBe(400);
     });
 
-    it('returns exactly {organization: {id, name}} on success', async () => {
-      prisma.organization.update.mockResolvedValue({ id: ORG_ID, name: 'Updated Name' });
+    it('returns exactly {organization: {id, name, industry, country, timezone}} on success', async () => {
+      prisma.organization.update.mockResolvedValue({
+        id: ORG_ID,
+        name: 'Updated Name',
+        industry: 'Non-Profit',
+        country: 'Nigeria',
+        timezone: 'UTC+01:00',
+      });
 
       const { status, json } = await request('PATCH', `/api/v1/organizations/${ORG_ID}`, validToken, {
         name: 'Updated Name',
       });
 
       expect(status).toBe(200);
-      expect(json.data).toEqual({ organization: { id: ORG_ID, name: 'Updated Name' } });
+      expect(json.data).toEqual({
+        organization: {
+          id: ORG_ID,
+          name: 'Updated Name',
+          industry: 'Non-Profit',
+          country: 'Nigeria',
+          timezone: 'UTC+01:00',
+        },
+      });
     });
   });
 

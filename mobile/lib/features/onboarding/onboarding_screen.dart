@@ -167,26 +167,31 @@ class _OnboardingPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(height: 16),
-          Image.asset(data.asset, height: 260),
-          const SizedBox(height: 32),
-          Text(
-            data.title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            data.subtitle,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
-          ),
-        ],
+    // Centered as one cohesive block (Product Task 090) — previously the
+    // content sat top-aligned inside its Expanded region, leaving a large,
+    // disconnected gap above the dots/Continue footer below it.
+    return Center(
+      key: const Key('onboardingPageCenteredContent'),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.asset(data.asset, height: 240),
+            const SizedBox(height: 24),
+            Text(
+              data.title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              data.subtitle,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -204,13 +209,17 @@ class _GetStartedPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const SizedBox(height: 16),
+    // Centered as one coherent hero block (Product Task 090) — previously
+    // this sat top-aligned within the page, rather than centered like the
+    // frozen "Let's get started." composition.
+    return Center(
+      key: const Key('getStartedPageCenteredContent'),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
           const Center(child: BrandMark(size: 104)),
           const SizedBox(height: 32),
           const Text(
@@ -233,7 +242,8 @@ class _GetStartedPage extends StatelessWidget {
               child: const Text('Already a member? Sign In'),
             ),
           ),
-        ],
+          ],
+        ),
       ),
     );
   }

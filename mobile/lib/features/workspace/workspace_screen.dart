@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../app/routing/app_router.dart';
 import '../../app/theme/app_colors.dart';
 import '../auth/auth_models.dart';
 import '../auth/auth_session_controller.dart';
@@ -57,7 +58,13 @@ class WorkspaceScreen extends ConsumerWidget {
                 side: const BorderSide(color: AppColors.danger),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
-              onPressed: () => ref.read(authSessionControllerProvider.notifier).logout(),
+              onPressed: () async {
+                // Explicit Logout must land on Sign In, never onboarding
+                // (Product Task 090B/092) — the general unauthenticated
+                // fallback (onboarding) is unchanged for every other case.
+                await ref.read(authSessionControllerProvider.notifier).logout();
+                if (context.mounted) context.go(signInPath);
+              },
               icon: const Icon(Icons.logout),
               label: const Text('Log Out', style: TextStyle(fontWeight: FontWeight.w700)),
             ),

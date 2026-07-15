@@ -7,12 +7,13 @@ import '../../app/theme/app_colors.dart';
 import '../../app/widgets/brand_mark.dart';
 import '../../app/widgets/labeled_text_field.dart';
 import '../../app/widgets/primary_button.dart';
-import '../../app/widgets/relvio_back_button.dart';
 import '../../core/providers.dart';
 
 /// Matches design/ui-reference/4.png's "Forgot your password?" composition:
 /// Email field, Send Reset Link button, back-to-Sign-In link (Product Task
-/// 072/074). Always shows the same non-disclosing success message the real
+/// 072/074). No boxed back button: the frozen panel shows none, and
+/// "← Back to Sign In" is the real, sole way back (Product Task 090A).
+/// Always shows the same non-disclosing success message the real
 /// API returns — never a claim that an email was actually sent, since no
 /// email delivery integration exists. Outside production, the API also
 /// returns developmentResetToken; when present, a clearly labelled
@@ -92,12 +93,6 @@ class _ForgotPasswordScreenState extends ConsumerState<ForgotPasswordScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: RelvioBackButton(
-                      onPressed: () => context.canPop() ? context.pop() : context.go(signInPath),
-                    ),
-                  ),
                   const Center(child: BrandMark(size: 96)),
                   const SizedBox(height: 24),
                   const Text(

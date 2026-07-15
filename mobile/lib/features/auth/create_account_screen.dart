@@ -7,21 +7,23 @@ import '../../app/theme/app_colors.dart';
 import '../../app/widgets/brand_mark.dart';
 import '../../app/widgets/labeled_text_field.dart';
 import '../../app/widgets/primary_button.dart';
-import '../../app/widgets/relvio_back_button.dart';
 import '../../core/api/api_exceptions.dart';
 import '../../core/providers.dart';
 
 /// Adapts design/ui-reference/4.png's "Create your organization." panel to
-/// the real, narrower POST /auth/register contract (Product Task 072/074):
-/// First Name, Last Name, Email, Password only. The frozen panel also shows
-/// an Organization Name field and a Confirm Password field, and its footer
-/// link reads "Create Organization" — none of that matches what this
-/// endpoint actually does (it creates a User only, never an Organization,
-/// and never auto-logs in), so this screen is truthfully titled "Create
-/// your account." and labelled "Create Account" throughout rather than
-/// reusing the frozen "Create Organization" wording, which would
-/// misrepresent the action. Organization creation remains its own separate,
-/// already-implemented, authenticated step (OrganizationSetupScreen).
+/// the real, narrower POST /auth/register contract (Product Task 072/074/090):
+/// First Name, Last Name, Email, Password, and Confirm Password (Confirm
+/// Password is real client-side-only validation — it is never sent to the
+/// API, since the real endpoint has no such field). The frozen panel also
+/// shows an Organization Name field, and its footer link reads "Create
+/// Organization" — neither matches what this endpoint actually does (it
+/// creates a User only, never an Organization, and never auto-logs in), so
+/// this screen is truthfully titled "Create your account." and labelled
+/// "Create Account" throughout rather than reusing the frozen "Create
+/// Organization" wording, which would misrepresent the action. Organization
+/// creation remains its own separate, already-implemented, authenticated
+/// step (OrganizationSetupScreen) — this screen never claims or implies an
+/// organization has already been created.
 class CreateAccountScreen extends ConsumerStatefulWidget {
   const CreateAccountScreen({super.key});
 
@@ -35,9 +37,11 @@ class _CreateAccountScreenState extends ConsumerState<CreateAccountScreen> {
   final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
 
   bool _submitting = false;
   bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
   String? _errorMessage;
 
   @override
@@ -46,6 +50,7 @@ class _CreateAccountScreenState extends ConsumerState<CreateAccountScreen> {
     _lastNameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -60,6 +65,14 @@ class _CreateAccountScreenState extends ConsumerState<CreateAccountScreen> {
   String? _passwordValidator(String? value) {
     if (value == null || value.isEmpty) return 'Password is required';
     if (value.length < 8) return 'Password must be at least 8 characters';
+    return null;
+  }
+
+  /// Real client-side validation only — Confirm Password is never sent to
+  /// POST /auth/register, which has no such field (Product Task 090).
+  String? _confirmPasswordValidator(String? value) {
+    if (value == null || value.isEmpty) return 'Please confirm your password';
+    if (value != _passwordController.text) return 'Passwords do not match';
     return null;
   }
 
@@ -108,6 +121,9 @@ class _CreateAccountScreenState extends ConsumerState<CreateAccountScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundPrimary,
+      // No back button here: the frozen "Create your organization." panel
+      // (design/ui-reference/4.png) shows none — "Already have an account?
+      // Sign In" is the real, sole way back (Product Task 090A).
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -118,12 +134,6 @@ class _CreateAccountScreenState extends ConsumerState<CreateAccountScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: RelvioBackButton(
-                      onPressed: () => context.canPop() ? context.pop() : context.go(signInPath),
-                    ),
-                  ),
                   const Center(child: BrandMark(size: 96)),
                   const SizedBox(height: 24),
                   const Text(
@@ -187,6 +197,23 @@ class _CreateAccountScreenState extends ConsumerState<CreateAccountScreen> {
                       onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                     ),
                     validator: _passwordValidator,
+                  ),
+                  const SizedBox(height: 20),
+                  LabeledTextField(
+                    label: 'Confirm Password',
+                    hintText: 'Confirm your password',
+                    controller: _confirmPasswordController,
+                    icon: Icons.lock_outline,
+                    obscureText: _obscureConfirmPassword,
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscureConfirmPassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                        color: AppColors.textSecondary,
+                        size: 20,
+                      ),
+                      onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                    ),
+                    validator: _confirmPasswordValidator,
                   ),
                   if (_errorMessage != null) ...[
                     const SizedBox(height: 16),

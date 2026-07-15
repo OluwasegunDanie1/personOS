@@ -62,8 +62,8 @@ class OrganizationContextController extends Notifier<OrganizationContextState> {
     }
   }
 
-  Future<void> createOrganization(String name) async {
-    await ref.read(organizationsApiProvider).create(name);
+  Future<void> createOrganization(String name, {String? industry, String? country, String? timezone}) async {
+    await ref.read(organizationsApiProvider).create(name, industry: industry, country: country, timezone: timezone);
     await restore();
   }
 

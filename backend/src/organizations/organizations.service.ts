@@ -23,6 +23,9 @@ export interface OrganizationListResult {
 export interface OrganizationDetail {
   id: string;
   name: string;
+  industry: string | null;
+  country: string | null;
+  timezone: string | null;
 }
 
 export interface OrganizationMemberSummary {
@@ -129,8 +132,15 @@ export class OrganizationsService {
 
     const [organization] = await this.prisma.$transaction([
       this.prisma.organization.create({
-        data: { id: organizationId, name: dto.name, slug },
-        select: { id: true, name: true },
+        data: {
+          id: organizationId,
+          name: dto.name,
+          slug,
+          industry: dto.industry ?? null,
+          country: dto.country ?? null,
+          timezone: dto.timezone ?? null,
+        },
+        select: { id: true, name: true, industry: true, country: true, timezone: true },
       }),
       this.prisma.role.create({
         data: { id: roleId, organizationId, name: OWNER_ROLE_NAME },
@@ -158,7 +168,7 @@ export class OrganizationsService {
   async detail(organizationId: string): Promise<{ organization: OrganizationDetail }> {
     const organization = await this.prisma.organization.findFirst({
       where: { id: organizationId },
-      select: { id: true, name: true },
+      select: { id: true, name: true, industry: true, country: true, timezone: true },
     });
 
     if (!organization) {
@@ -169,10 +179,16 @@ export class OrganizationsService {
   }
 
   async update(organizationId: string, dto: UpdateOrganizationDto): Promise<{ organization: OrganizationDetail }> {
+    const data: { name?: string; industry?: string | null; country?: string | null; timezone?: string | null } = {};
+    if (dto.name !== undefined) data.name = dto.name;
+    if (dto.industry !== undefined) data.industry = dto.industry;
+    if (dto.country !== undefined) data.country = dto.country;
+    if (dto.timezone !== undefined) data.timezone = dto.timezone;
+
     const organization = await this.prisma.organization.update({
       where: { id: organizationId },
-      data: { name: dto.name },
-      select: { id: true, name: true },
+      data,
+      select: { id: true, name: true, industry: true, country: true, timezone: true },
     });
 
     return { organization };

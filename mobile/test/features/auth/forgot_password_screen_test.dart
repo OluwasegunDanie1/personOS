@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:relvio/app/widgets/relvio_back_button.dart';
 import 'package:relvio/core/providers.dart';
 import 'package:relvio/features/auth/auth_api.dart';
 import 'package:relvio/features/auth/auth_models.dart';
@@ -204,5 +205,17 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(harness.router.state.uri.toString(), '/sign-in');
+  });
+
+  testWidgets('renders no boxed back button at all — the frozen panel shows none (Product Task 090A)', (
+    tester,
+  ) async {
+    await _pumpForgotPasswordScreen(
+      tester,
+      forgotPasswordHandler: ({required email}) async =>
+          const ForgotPasswordResult(message: _nonDisclosingMessage, developmentResetToken: null),
+    );
+
+    expect(find.byType(RelvioBackButton), findsNothing);
   });
 }

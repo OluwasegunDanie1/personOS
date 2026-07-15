@@ -149,4 +149,47 @@ void main() {
 
     expect(router.state.uri.toString(), '/sign-in');
   });
+
+  testWidgets(
+    'each informational panel centers its illustration/copy as one block, not top-aligned (Product Task 090)',
+    (tester) async {
+      await _pumpOnboardingScreen(tester);
+
+      expect(find.byKey(const Key('onboardingPageCenteredContent')), findsOneWidget);
+      expect(
+        find.ancestor(
+          of: find.text('Organize everything in one place.'),
+          matching: find.byKey(const Key('onboardingPageCenteredContent')),
+        ),
+        findsOneWidget,
+      );
+
+      await _tapContinue(tester);
+      expect(
+        find.ancestor(
+          of: find.text('Build stronger relationships.'),
+          matching: find.byKey(const Key('onboardingPageCenteredContent')),
+        ),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('panel 4 centers the logo/heading/copy/actions as one coherent hero block (Product Task 090)', (
+    tester,
+  ) async {
+    await _pumpOnboardingScreen(tester);
+
+    await tester.tap(find.text('Skip'));
+    await tester.pumpAndSettle();
+
+    final centeredContent = find.byKey(const Key('getStartedPageCenteredContent'));
+    expect(centeredContent, findsOneWidget);
+    expect(find.descendant(of: centeredContent, matching: find.text("Let's get started.")), findsOneWidget);
+    expect(find.descendant(of: centeredContent, matching: find.text('Create an Organization')), findsOneWidget);
+    expect(
+      find.descendant(of: centeredContent, matching: find.text('Already a member? Sign In')),
+      findsOneWidget,
+    );
+  });
 }
